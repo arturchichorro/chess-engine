@@ -295,11 +295,13 @@ impl Board {
                     self.get_pawn_captures(location),
                 ]
                 .concat(),
-                Type::Rook => self.get_queen_rook_bishop_moves(location, &Type::DIR_ROOK),
-                Type::Knight => self.get_king_knight_moves(location, &Type::DIR_KNIGHT),
-                Type::Bishop => self.get_queen_rook_bishop_moves(location, &Type::DIR_BISHOP),
-                Type::Queen => self.get_queen_rook_bishop_moves(location, &Type::DIR_QUEEN_KING),
-                Type::King => self.get_king_knight_moves(location, &Type::DIR_QUEEN_KING),
+                Type::Rook => self.get_queen_rook_bishop_moves(location, &Coord::LIST_CARDINAL),
+                Type::Knight => self.get_king_knight_moves(location, &Coord::LIST_KNIGHT),
+                Type::Bishop => self.get_queen_rook_bishop_moves(location, &Coord::LIST_DIAGONAL),
+                Type::Queen => {
+                    self.get_queen_rook_bishop_moves(location, &Coord::LIST_CARDINAL_DIAGONAL)
+                }
+                Type::King => self.get_king_knight_moves(location, &Coord::LIST_CARDINAL_DIAGONAL),
             };
             legal_moves
         } else {

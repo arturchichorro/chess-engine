@@ -27,6 +27,30 @@ impl Coord {
     pub const DDL: Self = Self { row: -2, col: -1 };
     pub const DLL: Self = Self { row: -1, col: -2 };
 
+    // Lists
+    pub const LIST_CARDINAL: [Self; 4] = [Self::R, Self::D, Self::U, Self::L];
+    pub const LIST_DIAGONAL: [Self; 4] = [Self::UR, Self::UL, Self::DR, Self::DL];
+    pub const LIST_CARDINAL_DIAGONAL: [Self; 8] = [
+        Self::R,
+        Self::D,
+        Self::U,
+        Self::L,
+        Self::UR,
+        Self::UL,
+        Self::DR,
+        Self::DL,
+    ];
+    pub const LIST_KNIGHT: [Self; 8] = [
+        Self::UUR,
+        Self::URR,
+        Self::UUL,
+        Self::ULL,
+        Self::DDR,
+        Self::DRR,
+        Self::DDL,
+        Self::DLL,
+    ];
+
     pub fn is_valid(&self) -> bool {
         self.col <= 7 && self.row <= 7 && self.col >= 0 && self.row >= 0
     }
