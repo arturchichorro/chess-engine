@@ -118,7 +118,7 @@ impl Board {
         if let Some(piece_in_square) = self.square_get(coord) {
             match piece_in_square.kind {
                 Kind::Pawn => {
-                    dbg!(vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat())
+                    vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
                 }
                 Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
                 Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
@@ -285,49 +285,32 @@ impl Board {
     fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
         let dir = player.advancing_direction();
-        let left_capture = origin + dir + Coord::L;
-        let right_capture = origin + dir + Coord::R;
-        let mut results: Vec<Ply> = vec![];
 
-        // Capture to the left
-        if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
-        {
-            if left_capture.row == 7 || left_capture.row == 0 {
-                for promo in Kind::PROMOTIONS {
-                    results.push(Ply {
+        let mut results: Vec<Ply> = [Coord::L, Coord::R]
+            .iter()
+            .map(|&delta| origin + dir + delta)
+            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
+            .map(|pos| {
+                if pos.row == 7 || pos.row == 0 {
+                    Kind::PROMOTIONS
+                        .iter()
+                        .map(|&promo| Ply {
+                            origin,
+                            destination: pos,
+                            promotion: Some(promo),
+                        })
+                        .collect()
+                } else {
+                    // TODO: remove vector
+                    vec![Ply {
                         origin,
-                        destination: left_capture,
-                        promotion: Some(promo),
-                    })
+                        destination: pos,
+                        promotion: None,
+                    }]
                 }
-            } else {
-                results.push(Ply {
-                    origin,
-                    destination: left_capture,
-                    promotion: None,
-                })
-            }
-        }
-        // Capture to the right
-        if right_capture.is_valid()
-            && self.player_at_square(right_capture) == Some(player.opponent())
-        {
-            if right_capture.row == 7 || right_capture.row == 0 {
-                for promo in Kind::PROMOTIONS {
-                    results.push(Ply {
-                        origin,
-                        destination: right_capture,
-                        promotion: Some(promo),
-                    })
-                }
-            } else {
-                results.push(Ply {
-                    origin,
-                    destination: right_capture,
-                    promotion: None,
-                })
-            }
-        }
+            })
+            .flatten()
+            .collect();
 
         // En passant
         if self.en_passant_square.is_some() {
@@ -343,7 +326,7 @@ impl Board {
             }
         }
 
-        dbg!(results)
+        results
     }
 
     fn get_all_moves(&self) -> Vec<Ply> {

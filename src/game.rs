@@ -68,10 +68,10 @@ impl Game {
 
         let items = input.trim().split(" ").collect::<Vec<&str>>();
 
-        dbg!(Some(Ply {
+        Some(Ply {
             origin: parse_coord(items.get(0)?)?,
             destination: parse_coord(items.get(1)?)?,
             promotion: items.get(2).and_then(|&s| parse_promotion(s)),
-        }))
+        })
     }
 }
