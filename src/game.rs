@@ -61,17 +61,17 @@ impl Game {
                 "q" => Some(Kind::Queen),
                 "r" => Some(Kind::Rook),
                 "b" => Some(Kind::Bishop),
-                "n" => Some(Kind::Knight),
+                "n" | "k" => Some(Kind::Knight),
                 _ => None,
             }
         };
 
         let items = input.trim().split(" ").collect::<Vec<&str>>();
 
-        Some(Ply {
+        dbg!(Some(Ply {
             origin: parse_coord(items.get(0)?)?,
             destination: parse_coord(items.get(1)?)?,
             promotion: items.get(2).and_then(|&s| parse_promotion(s)),
-        })
+        }))
     }
 }

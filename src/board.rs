@@ -118,7 +118,7 @@ impl Board {
         if let Some(piece_in_square) = self.square_get(coord) {
             match piece_in_square.kind {
                 Kind::Pawn => {
-                    vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
+                    dbg!(vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat())
                 }
                 Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
                 Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
@@ -236,7 +236,7 @@ impl Board {
         new_game_state.square_set(ply.origin, None);
 
         // Change turn and return new game state
-        new_game_state.turn = new_game_state.turn.opponent();
+        // new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
     }
 
@@ -309,7 +309,8 @@ impl Board {
             }
         }
         // Capture to the right
-        if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
+        if right_capture.is_valid()
+            && self.player_at_square(right_capture) == Some(player.opponent())
         {
             if right_capture.row == 7 || right_capture.row == 0 {
                 for promo in Kind::PROMOTIONS {
@@ -342,7 +343,7 @@ impl Board {
             }
         }
 
-        results
+        dbg!(results)
     }
 
     fn get_all_moves(&self) -> Vec<Ply> {
