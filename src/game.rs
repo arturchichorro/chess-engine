@@ -1,6 +1,5 @@
-use std::io;
-
 use crate::{board::Board, ply::Ply};
+use std::io;
 
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -60,7 +59,7 @@ impl Game {
                 }
             })
             .collect::<Option<Vec<_>>>()
-            .filter(|v| v.len() == 3)
+            .filter(|v| v.len() == 2)
             .map(|v| Ply {
                 origin: v[0],
                 destination: v[1],
