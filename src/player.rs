@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::coord::Coord;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Player {
     Black,
@@ -14,10 +16,10 @@ impl Player {
         }
     }
 
-    pub fn advancing_direction(&self) -> i32 {
+    pub fn advancing_direction(&self) -> Coord {
         match self {
-            Player::Black => -1,
-            Player::White => 1,
+            Player::Black => Coord::D,
+            Player::White => Coord::U,
         }
     }
 }

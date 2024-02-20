@@ -119,9 +119,9 @@ impl Board {
                 let mut plys = vec![];
 
                 for i in 1.. {
-                    let pos = origin.add(&dir.mult(i));
+                    let pos = origin + (*dir) * i;
 
-                    if !pos.is_valid_location() {
+                    if !pos.is_valid() {
                         break;
                     }
 
@@ -155,7 +155,7 @@ impl Board {
                 row: origin.row + delta.row,
                 col: origin.col + delta.col,
             })
-            .filter(|&pos| pos.is_valid_location() && self.player_at_square(pos) != Some(player))
+            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
             .map(|pos| Ply {
                 origin,
                 destination: pos,
@@ -171,28 +171,19 @@ impl Board {
 
         let mut results: Vec<Ply> = vec![];
 
-        if !self.square_is_occupied(Coord {
-            row: origin.row + dir,
-            col: origin.col,
-        }) {
+        if !self.square_is_occupied(origin + dir) {
             if origin.row == 0 || origin.row == 7 {
                 for promo in Type::PROMOTIONS {
                     results.push(Ply {
                         origin,
-                        destination: Coord {
-                            row: origin.row + dir,
-                            col: origin.col,
-                        },
+                        destination: origin + dir,
                         promotion: Some(promo),
                     })
                 }
             } else {
                 results.push(Ply {
                     origin,
-                    destination: Coord {
-                        row: origin.row + dir,
-                        col: origin.col,
-                    },
+                    destination: origin + dir,
                     promotion: None,
                 })
             }
@@ -201,16 +192,10 @@ impl Board {
         }
 
         if origin.row % 5 == 1 {
-            if !self.square_is_occupied(Coord {
-                row: origin.row + 2 * dir,
-                col: origin.col,
-            }) {
+            if !self.square_is_occupied(origin + 2 * dir) {
                 results.push(Ply {
                     origin,
-                    destination: Coord {
-                        row: origin.row + 2 * dir,
-                        col: origin.col,
-                    },
+                    destination: origin + 2 * dir,
                     promotion: None,
                 })
             }
@@ -222,19 +207,12 @@ impl Board {
     fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
         let dir = player.advancing_direction();
-        let left_capture = Coord {
-            row: origin.row + dir,
-            col: origin.col - 1,
-        };
-        let right_capture = Coord {
-            row: origin.row + dir,
-            col: origin.col + 1,
-        };
+        let left_capture = origin + dir + Coord::L;
+        let right_capture = origin + dir + Coord::R;
         let mut results: Vec<Ply> = vec![];
 
         // Capture to the left
-        if left_capture.is_valid_location()
-            && self.player_at_square(left_capture) == Some(player.opponent())
+        if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if left_capture.row == 7 || left_capture.row == 0 {
                 for promo in Type::PROMOTIONS {
@@ -253,8 +231,7 @@ impl Board {
             }
         }
         // Capture to the right
-        if left_capture.is_valid_location()
-            && self.player_at_square(left_capture) == Some(player.opponent())
+        if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if right_capture.row == 7 || right_capture.row == 0 {
                 for promo in Type::PROMOTIONS {
@@ -276,7 +253,7 @@ impl Board {
         // En passant
         if self.en_passant_square.is_some() {
             let ep_square = self.en_passant_square.unwrap();
-            if origin.row + dir == ep_square.row {
+            if (origin + dir).row == ep_square.row {
                 if (origin.col + 1 == ep_square.col) || (origin.col - 1 == ep_square.col) {
                     results.push(Ply {
                         origin,
@@ -349,22 +326,13 @@ impl Board {
             && ply.origin.col != ply.destination.col
             && self.square_get(ply.destination).is_none()
         {
-            new_game_state.square_set(
-                Coord {
-                    row: ply.destination.row - dir,
-                    col: ply.destination.col,
-                },
-                None,
-            );
+            new_game_state.square_set(ply.destination - dir, None);
         }
 
         // Updating en_passant_square
         new_game_state.en_passant_square =
-            if piece == Type::Pawn && ply.destination.row == ply.origin.row + 2 * dir {
-                Some(Coord {
-                    row: ply.origin.row + dir,
-                    col: ply.origin.col,
-                })
+            if piece == Type::Pawn && ply.destination.row == (ply.origin + 2 * dir).row {
+                Some(ply.origin + dir)
             } else {
                 None
             };

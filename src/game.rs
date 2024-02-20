@@ -16,9 +16,6 @@ impl Game {
         Game {
             states: vec![Board::new_from_fen(fen)],
         }
-
-        // Test Fen
-        // Board::new_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b K- e3 0 1")
     }
 
     pub fn play(&mut self) {

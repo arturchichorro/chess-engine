@@ -5,44 +5,73 @@ pub struct Coord {
 }
 
 impl Coord {
-    pub const R: Self = Coord::new(0, 1);
-    pub const D: Self = Coord::new(-1, 0);
-    pub const U: Self = Coord::new(1, 0);
-    pub const L: Self = Coord::new(0, -1);
-    pub const UR: Self = Coord::new(1, 1);
-    pub const UL: Self = Coord::new(1, -1);
-    pub const DR: Self = Coord::new(-1, 1);
-    pub const DL: Self = Coord::new(-1, -1);
+    // Cardinal directions
+    pub const R: Self = Self { row: 0, col: 1 };
+    pub const D: Self = Self { row: -1, col: 0 };
+    pub const U: Self = Self { row: 1, col: 0 };
+    pub const L: Self = Self { row: 0, col: -1 };
+
+    // Diagonal directions
+    pub const UR: Self = Self { row: 1, col: 1 };
+    pub const UL: Self = Self { row: 1, col: -1 };
+    pub const DR: Self = Self { row: -1, col: 1 };
+    pub const DL: Self = Self { row: -1, col: -1 };
 
     // Knight directions
-    pub const UUR: Self = Coord::new(2, 1);
-    pub const URR: Self = Coord::new(1, 2);
-    pub const UUL: Self = Coord::new(2, -1);
-    pub const ULL: Self = Coord::new(1, -2);
-    pub const DDR: Self = Coord::new(-2, 1);
-    pub const DRR: Self = Coord::new(-1, 2);
-    pub const DDL: Self = Coord::new(-2, -1);
-    pub const DLL: Self = Coord::new(-1, -2);
+    pub const UUR: Self = Self { row: 2, col: 1 };
+    pub const URR: Self = Self { row: 1, col: 2 };
+    pub const UUL: Self = Self { row: 2, col: -1 };
+    pub const ULL: Self = Self { row: 1, col: -2 };
+    pub const DDR: Self = Self { row: -2, col: 1 };
+    pub const DRR: Self = Self { row: -1, col: 2 };
+    pub const DDL: Self = Self { row: -2, col: -1 };
+    pub const DLL: Self = Self { row: -1, col: -2 };
 
-    pub const fn new(col: i32, row: i32) -> Coord {
-        Coord { row: col, col: row } // TODO: Fix this
+    pub fn is_valid(&self) -> bool {
+        self.col <= 7 && self.row <= 7 && self.col >= 0 && self.row >= 0
     }
+}
 
-    pub fn is_valid_location(&self) -> bool {
-        !(self.col > 7 || self.row > 7 || self.col < 0 || self.row < 0)
-    }
+impl std::ops::Add for Coord {
+    type Output = Self;
 
-    pub fn add(&self, delta: &Coord) -> Coord {
+    fn add(self, other: Self) -> Self {
         Coord {
-            row: self.row + delta.row,
-            col: self.col + delta.col,
+            row: self.row + other.row,
+            col: self.col + other.col,
         }
     }
+}
 
-    pub fn mult(&self, factor: i32) -> Coord {
+impl std::ops::Sub for Coord {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
         Coord {
-            row: factor * self.row,
-            col: factor * self.col,
+            row: self.row - other.row,
+            col: self.col - other.col,
+        }
+    }
+}
+
+impl std::ops::Mul<i32> for Coord {
+    type Output = Self;
+
+    fn mul(self, factor: i32) -> Self {
+        Coord {
+            row: self.row * factor,
+            col: self.col * factor,
+        }
+    }
+}
+
+impl std::ops::Mul<Coord> for i32 {
+    type Output = Coord;
+
+    fn mul(self, coord: Coord) -> Coord {
+        Coord {
+            row: self * coord.row,
+            col: self * coord.col,
         }
     }
 }
