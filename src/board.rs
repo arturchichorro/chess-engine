@@ -201,6 +201,45 @@ impl Board {
             .collect()
     }
 
+    pub fn make_move(&self, ply: Ply) -> Board {
+        let mut new_game_state = self.clone();
+
+        let piece = self.square_get(ply.origin).unwrap();
+        let dir = piece.player.advancing_direction();
+
+        // Detect if move was en passant abd remove the captured pawn
+        if piece.kind == Kind::Pawn
+            && ply.origin.col != ply.destination.col
+            && self.square_get(ply.destination).is_none()
+        {
+            new_game_state.square_set(ply.destination - dir, None);
+        }
+
+        // Update en_passant_square
+        new_game_state.en_passant_square =
+            if piece.kind == Kind::Pawn && ply.destination == ply.origin + 2 * dir {
+                Some(ply.origin + dir)
+            } else {
+                None
+            };
+
+        // Set piece (including promotions) on new square
+        new_game_state.square_set(
+            ply.destination,
+            Some(Piece {
+                kind: ply.promotion.unwrap_or(piece.kind),
+                player: piece.player,
+            }),
+        );
+
+        // Remove piece from old square
+        new_game_state.square_set(ply.origin, None);
+
+        // Change turn and return new game state
+        new_game_state.turn = new_game_state.turn.opponent();
+        new_game_state
+    }
+
     // -----------------
 
     fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
@@ -330,44 +369,5 @@ impl Board {
         let legal_moves = self.get_pseudo_legal_moves(ply.origin);
 
         legal_moves.contains(ply)
-    }
-
-    pub fn make_move(&self, ply: Ply) -> Board {
-        let mut new_game_state = self.clone();
-
-        let piece = self.square_get(ply.origin).unwrap();
-        let dir = piece.player.advancing_direction();
-
-        // Detect if move was en passant abd remove the captured pawn
-        if piece.kind == Kind::Pawn
-            && ply.origin.col != ply.destination.col
-            && self.square_get(ply.destination).is_none()
-        {
-            new_game_state.square_set(ply.destination - dir, None);
-        }
-
-        // Update en_passant_square
-        new_game_state.en_passant_square =
-            if piece.kind == Kind::Pawn && ply.destination == ply.origin + 2 * dir {
-                Some(ply.origin + dir)
-            } else {
-                None
-            };
-
-        // Set piece (including promotions) on new square
-        new_game_state.square_set(
-            ply.destination,
-            Some(Piece {
-                kind: ply.promotion.unwrap_or(piece.kind),
-                player: piece.player,
-            }),
-        );
-
-        // Remove piece from old square
-        new_game_state.square_set(ply.origin, None);
-
-        // Change turn and return new game state
-        new_game_state.turn = new_game_state.turn.opponent();
-        new_game_state
     }
 }
