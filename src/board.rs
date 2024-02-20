@@ -7,8 +7,10 @@ use crate::{
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Board {
-    board: [[Option<Piece>; 8]; 8],
     pub turn: Player,
+
+    board: [[Option<Piece>; 8]; 8],
+
     white_can_oo: bool,
     white_can_ooo: bool,
     black_can_oo: bool,
@@ -65,7 +67,7 @@ impl Board {
                     fen::PieceKind::King => Type::King,
                 };
 
-                *board.square_idx_mut(Coord { row: col, col: row }) = Some(Piece { piece, player })
+                board.coord_set(Coord { row, col }, Some(Piece { piece, player }));
             });
 
         board
@@ -85,11 +87,13 @@ impl Board {
             None
         }
     }
-    fn square_idx(&self, origin: Coord) -> &Option<Piece> {
-        &self.board[origin.row as usize][origin.col as usize]
+
+    fn coord_get(&self, coord: Coord) -> &Option<Piece> {
+        &self.board[coord.row as usize][coord.col as usize]
     }
-    fn square_idx_mut(&mut self, origin: Coord) -> &mut Option<Piece> {
-        &mut self.board[origin.row as usize][origin.col as usize]
+
+    fn coord_set(&mut self, coord: Coord, piece: Option<Piece>) {
+        self.board[coord.row as usize][coord.col as usize] = piece;
     }
 
     pub fn print_board(&self, player_pov: Player) {
@@ -110,11 +114,11 @@ impl Board {
     }
 
     fn is_occupied(&self, location: Coord) -> bool {
-        self.square_idx(location).is_some()
+        self.coord_get(location).is_some()
     }
 
     fn player_at_location(&self, location: Coord) -> Option<Player> {
-        self.square_idx(location).map(|piece| piece.player)
+        self.coord_get(location).map(|piece| piece.player)
     }
 
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
@@ -302,7 +306,7 @@ impl Board {
 
         for row in 0..8 {
             for col in 0..8 {
-                if let Some(piece) = self.square_idx(Coord { row, col }) {
+                if let Some(piece) = self.coord_get(Coord { row, col }) {
                     if self.turn == piece.player {
                         moves.extend(self.get_pseudo_legal_moves(Coord { row, col }).iter())
                     }
@@ -318,7 +322,7 @@ impl Board {
     }
 
     fn get_pseudo_legal_moves(&self, location: Coord) -> Vec<Ply> {
-        if let Some(piece_in_square) = self.square_idx(location) {
+        if let Some(piece_in_square) = self.coord_get(location) {
             let legal_moves = match piece_in_square.piece {
                 Type::Pawn => vec![
                     self.get_pawn_moves(location),
@@ -347,19 +351,22 @@ impl Board {
         let mut new_game_state = self.clone();
 
         let player = self.player_at_location(ply.origin).unwrap();
-        let piece = self.square_idx(ply.origin).unwrap().piece;
+        let piece = self.coord_get(ply.origin).unwrap().piece;
 
         let dir = player.advancing_direction();
 
         // Detecting if move was en passant
         if piece == Type::Pawn
             && ply.origin.col != ply.destination.col
-            && self.square_idx(ply.destination).is_none()
+            && self.coord_get(ply.destination).is_none()
         {
-            *new_game_state.square_idx_mut(Coord {
-                col: ply.destination.col,
-                row: ply.destination.row - dir,
-            }) = None;
+            new_game_state.coord_set(
+                Coord {
+                    row: ply.destination.row - dir,
+                    col: ply.destination.col,
+                },
+                None,
+            );
         }
 
         // Updating en_passant_square
@@ -375,15 +382,12 @@ impl Board {
 
         // Promotion
         if let Some(new_piece) = ply.promotion {
-            new_game_state
-                .square_idx_mut(ply.origin)
-                .as_mut()
-                .unwrap()
-                .piece = new_piece;
+            // TODO
+            // new_game_state.coord_set(ply.origin).as_mut().unwrap().piece = new_piece;
         }
 
-        *new_game_state.square_idx_mut(ply.destination) = *new_game_state.square_idx(ply.origin);
-        *new_game_state.square_idx_mut(ply.origin) = None;
+        new_game_state.coord_set(ply.destination, *new_game_state.coord_get(ply.origin));
+        new_game_state.coord_set(ply.origin, None);
 
         new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
