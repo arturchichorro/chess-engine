@@ -1,4 +1,4 @@
-use crate::{coord::Coord, player::Player};
+use crate::player::Player;
 use std::fmt::{self, Write};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

@@ -59,22 +59,26 @@ impl Board {
             .map(|(i, p)| p.map(|x| (i, x)))
             .flatten()
             .for_each(|(i, p)| {
-                let row = (i / 8) as i32;
-                let col = (i % 8) as i32;
-                let player = match p.color {
-                    fen::Color::White => Player::White,
-                    fen::Color::Black => Player::Black,
-                };
-                let piece = match p.kind {
-                    fen::PieceKind::Pawn => Type::Pawn,
-                    fen::PieceKind::Knight => Type::Knight,
-                    fen::PieceKind::Bishop => Type::Bishop,
-                    fen::PieceKind::Rook => Type::Rook,
-                    fen::PieceKind::Queen => Type::Queen,
-                    fen::PieceKind::King => Type::King,
-                };
-
-                board.square_set(Coord { row, col }, Some(Piece { piece, player }));
+                board.square_set(
+                    Coord {
+                        row: (i / 8) as i32,
+                        col: (i % 8) as i32,
+                    },
+                    Some(Piece {
+                        player: match p.color {
+                            fen::Color::White => Player::White,
+                            fen::Color::Black => Player::Black,
+                        },
+                        piece: match p.kind {
+                            fen::PieceKind::Pawn => Type::Pawn,
+                            fen::PieceKind::Knight => Type::Knight,
+                            fen::PieceKind::Bishop => Type::Bishop,
+                            fen::PieceKind::Rook => Type::Rook,
+                            fen::PieceKind::Queen => Type::Queen,
+                            fen::PieceKind::King => Type::King,
+                        },
+                    }),
+                );
             });
 
         board
@@ -108,6 +112,40 @@ impl Board {
     }
     fn player_at_square(&self, location: Coord) -> Option<Player> {
         self.square_get(location).map(|piece| piece.player)
+    }
+
+    fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+        if let Some(piece_in_square) = self.square_get(coord) {
+            match piece_in_square.piece {
+                Type::Pawn => {
+                    vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
+                }
+                Type::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
+                Type::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
+                Type::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
+                Type::Queen => {
+                    self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
+                }
+                Type::King => self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+            }
+        } else {
+            vec![]
+        }
+    }
+
+    fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+        let player = self.player_at_square(origin).unwrap();
+
+        directions
+            .iter()
+            .map(|&delta| origin + delta)
+            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
+            .map(|pos| Ply {
+                origin,
+                destination: pos,
+                promotion: None,
+            })
+            .collect()
     }
 
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
@@ -146,23 +184,7 @@ impl Board {
             .collect()
     }
 
-    fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
-        let player = self.player_at_square(origin).unwrap();
-
-        directions
-            .iter()
-            .map(|delta| Coord {
-                row: origin.row + delta.row,
-                col: origin.col + delta.col,
-            })
-            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
-            .map(|pos| Ply {
-                origin,
-                destination: pos,
-                promotion: None,
-            })
-            .collect()
-    }
+    // -----------------
 
     fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
@@ -285,28 +307,6 @@ impl Board {
 
     fn get_castling_moves(&self, origin: Coord) -> Vec<Ply> {
         todo!()
-    }
-
-    fn get_pseudo_legal_moves(&self, location: Coord) -> Vec<Ply> {
-        if let Some(piece_in_square) = self.square_get(location) {
-            let legal_moves = match piece_in_square.piece {
-                Type::Pawn => vec![
-                    self.get_pawn_moves(location),
-                    self.get_pawn_captures(location),
-                ]
-                .concat(),
-                Type::Rook => self.get_queen_rook_bishop_moves(location, &Coord::LIST_CARDINAL),
-                Type::Knight => self.get_king_knight_moves(location, &Coord::LIST_KNIGHT),
-                Type::Bishop => self.get_queen_rook_bishop_moves(location, &Coord::LIST_DIAGONAL),
-                Type::Queen => {
-                    self.get_queen_rook_bishop_moves(location, &Coord::LIST_CARDINAL_DIAGONAL)
-                }
-                Type::King => self.get_king_knight_moves(location, &Coord::LIST_CARDINAL_DIAGONAL),
-            };
-            legal_moves
-        } else {
-            vec![]
-        }
     }
 
     pub fn arbiter(&self, ply: &Ply) -> bool {
