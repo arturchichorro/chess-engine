@@ -1,6 +1,6 @@
 use crate::{
     coord::Coord,
-    piece::{Piece, Type},
+    piece::{Kind, Piece},
     player::Player,
     ply::Ply,
 };
@@ -69,13 +69,13 @@ impl Board {
                             fen::Color::White => Player::White,
                             fen::Color::Black => Player::Black,
                         },
-                        piece: match p.kind {
-                            fen::PieceKind::Pawn => Type::Pawn,
-                            fen::PieceKind::Knight => Type::Knight,
-                            fen::PieceKind::Bishop => Type::Bishop,
-                            fen::PieceKind::Rook => Type::Rook,
-                            fen::PieceKind::Queen => Type::Queen,
-                            fen::PieceKind::King => Type::King,
+                        kind: match p.kind {
+                            fen::PieceKind::Pawn => Kind::Pawn,
+                            fen::PieceKind::Knight => Kind::Knight,
+                            fen::PieceKind::Bishop => Kind::Bishop,
+                            fen::PieceKind::Rook => Kind::Rook,
+                            fen::PieceKind::Queen => Kind::Queen,
+                            fen::PieceKind::King => Kind::King,
                         },
                     }),
                 );
@@ -116,17 +116,17 @@ impl Board {
 
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.square_get(coord) {
-            match piece_in_square.piece {
-                Type::Pawn => {
+            match piece_in_square.kind {
+                Kind::Pawn => {
                     vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
                 }
-                Type::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
-                Type::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
-                Type::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
-                Type::Queen => {
+                Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
+                Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
+                Kind::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
+                Kind::Queen => {
                     self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
                 }
-                Type::King => self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                Kind::King => self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
             }
         } else {
             vec![]
@@ -151,34 +151,51 @@ impl Board {
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
+        // directions
+        //     .iter()
+        //     .map(|dir| {
+        //         let mut plys = vec![];
+
+        //         for i in 1.. {
+        //             let pos = origin + (*dir) * i;
+
+        //             if !pos.is_valid() {
+        //                 break;
+        //             }
+
+        //             if self.player_at_square(pos) == Some(player) {
+        //                 break;
+        //             }
+
+        //             plys.push(Ply {
+        //                 origin,
+        //                 destination: pos,
+        //                 promotion: None,
+        //             });
+
+        //             if self.player_at_square(pos) == Some(player.opponent()) {
+        //                 break;
+        //             }
+        //         }
+
+        //         plys.into_iter()
+        //     })
+        //     .flatten()
+        //     .collect()
+
         directions
             .iter()
-            .map(|dir| {
-                let mut plys = vec![];
-
-                for i in 1.. {
-                    let pos = origin + (*dir) * i;
-
-                    if !pos.is_valid() {
-                        break;
-                    }
-
-                    if self.player_at_square(pos) == Some(player) {
-                        break;
-                    }
-
-                    plys.push(Ply {
+            .map(|&dir| {
+                (1..)
+                    .map(move |i| origin + dir * i)
+                    .take_while(|&c| c.is_valid())
+                    .take_while(|&c| self.player_at_square(c) != Some(player))
+                    .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
+                    .map(|c| Ply {
                         origin,
-                        destination: pos,
+                        destination: c,
                         promotion: None,
-                    });
-
-                    if self.player_at_square(pos) == Some(player.opponent()) {
-                        break;
-                    }
-                }
-
-                plys.into_iter()
+                    })
             })
             .flatten()
             .collect()
@@ -195,7 +212,7 @@ impl Board {
 
         if !self.square_is_occupied(origin + dir) {
             if origin.row == 0 || origin.row == 7 {
-                for promo in Type::PROMOTIONS {
+                for promo in Kind::PROMOTIONS {
                     results.push(Ply {
                         origin,
                         destination: origin + dir,
@@ -237,7 +254,7 @@ impl Board {
         if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if left_capture.row == 7 || left_capture.row == 0 {
-                for promo in Type::PROMOTIONS {
+                for promo in Kind::PROMOTIONS {
                     results.push(Ply {
                         origin,
                         destination: left_capture,
@@ -256,7 +273,7 @@ impl Board {
         if left_capture.is_valid() && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if right_capture.row == 7 || right_capture.row == 0 {
-                for promo in Type::PROMOTIONS {
+                for promo in Kind::PROMOTIONS {
                     results.push(Ply {
                         origin,
                         destination: right_capture,
@@ -318,42 +335,39 @@ impl Board {
     pub fn make_move(&self, ply: Ply) -> Board {
         let mut new_game_state = self.clone();
 
-        let player = self.player_at_square(ply.origin).unwrap();
-        let piece = self.square_get(ply.origin).unwrap().piece;
+        let piece = self.square_get(ply.origin).unwrap();
+        let dir = piece.player.advancing_direction();
 
-        let dir = player.advancing_direction();
-
-        // Detecting if move was en passant
-        if piece == Type::Pawn
+        // Detect if move was en passant abd remove the captured pawn
+        if piece.kind == Kind::Pawn
             && ply.origin.col != ply.destination.col
             && self.square_get(ply.destination).is_none()
         {
             new_game_state.square_set(ply.destination - dir, None);
         }
 
-        // Updating en_passant_square
+        // Update en_passant_square
         new_game_state.en_passant_square =
-            if piece == Type::Pawn && ply.destination.row == (ply.origin + 2 * dir).row {
+            if piece.kind == Kind::Pawn && ply.destination == ply.origin + 2 * dir {
                 Some(ply.origin + dir)
             } else {
                 None
             };
 
-        // Promotion
-        if let Some(new_piece) = ply.promotion {
-            // TODO
-            // new_game_state.coord_set(ply.origin).as_mut().unwrap().piece = new_piece;
-        }
+        // Set piece (including promotions) on new square
+        new_game_state.square_set(
+            ply.destination,
+            Some(Piece {
+                kind: ply.promotion.unwrap_or(piece.kind),
+                player: piece.player,
+            }),
+        );
 
-        new_game_state.square_set(ply.destination, *new_game_state.square_get(ply.origin));
+        // Remove piece from old square
         new_game_state.square_set(ply.origin, None);
 
+        // Change turn and return new game state
         new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
-    }
-
-    fn verify_status(&self) -> String {
-        // Verifica se o jogo acaba em checkmate ou não
-        todo!()
     }
 }

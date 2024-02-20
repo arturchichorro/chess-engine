@@ -18,8 +18,8 @@ impl Player {
 
     pub fn advancing_direction(&self) -> Coord {
         match self {
-            Player::Black => Coord::D,
             Player::White => Coord::U,
+            Player::Black => Coord::D,
         }
     }
 }

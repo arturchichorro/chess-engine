@@ -3,18 +3,18 @@ use std::fmt::{self, Write};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Piece {
-    pub piece: Type,
+    pub kind: Kind,
     pub player: Player,
 }
 
 impl fmt::Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_char(self.piece.character(self.player))
+        f.write_char(self.kind.character(self.player))
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Type {
+pub enum Kind {
     Pawn,
     Rook,
     Knight,
@@ -23,26 +23,26 @@ pub enum Type {
     King,
 }
 
-impl Type {
-    pub const PROMOTIONS: [Type; 4] = [Type::Queen, Type::Rook, Type::Bishop, Type::Knight];
+impl Kind {
+    pub const PROMOTIONS: [Kind; 4] = [Kind::Queen, Kind::Rook, Kind::Bishop, Kind::Knight];
 
     fn character(&self, player: Player) -> char {
         match player {
             Player::White => match self {
-                Type::Pawn => '♙',
-                Type::Rook => '♖',
-                Type::Knight => '♘',
-                Type::Bishop => '♗',
-                Type::Queen => '♕',
-                Type::King => '♔',
+                Kind::Pawn => '♙',
+                Kind::Rook => '♖',
+                Kind::Knight => '♘',
+                Kind::Bishop => '♗',
+                Kind::Queen => '♕',
+                Kind::King => '♔',
             },
             Player::Black => match self {
-                Type::Pawn => '♟',
-                Type::Rook => '♜',
-                Type::Knight => '♞',
-                Type::Bishop => '♝',
-                Type::Queen => '♛',
-                Type::King => '♚',
+                Kind::Pawn => '♟',
+                Kind::Rook => '♜',
+                Kind::Knight => '♞',
+                Kind::Bishop => '♝',
+                Kind::Queen => '♛',
+                Kind::King => '♚',
             },
         }
     }
