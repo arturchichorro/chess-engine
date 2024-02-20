@@ -20,6 +20,17 @@ pub struct Board {
 }
 
 impl Board {
+    pub fn notation_conversion(v1: char, v2: i32) -> Option<Coord> {
+        if (v1 as i32) >= ('a' as i32) && (v1 as i32) <= ('h' as i32) && v2 >= 1 && v2 <= 8 {
+            Some(Coord {
+                row: v2 - 1 as i32,
+                col: (v1 as i32) - ('a' as i32),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn new_from_fen(fen: &str) -> Board {
         let mut board: Board = Default::default();
 
@@ -36,13 +47,9 @@ impl Board {
         board.black_can_ooo = board_from_fen.black_can_ooo;
         board.half_move_clock = board_from_fen.halfmove_clock;
 
-        board.en_passant_square = board_from_fen.en_passant_square.map(|x| {
-            let row_en_passant = (x % 8) as i32;
-            let col_en_passant = (x / 8) as i32;
-            Coord {
-                col: row_en_passant,
-                row: col_en_passant,
-            }
+        board.en_passant_square = board_from_fen.en_passant_square.map(|x| Coord {
+            row: (x / 8) as i32,
+            col: (x % 8) as i32,
         });
 
         board_from_fen
@@ -52,8 +59,8 @@ impl Board {
             .map(|(i, p)| p.map(|x| (i, x)))
             .flatten()
             .for_each(|(i, p)| {
-                let row = (i % 8) as i32;
-                let col = (i / 8) as i32;
+                let row = (i / 8) as i32;
+                let col = (i % 8) as i32;
                 let player = match p.color {
                     fen::Color::White => Player::White,
                     fen::Color::Black => Player::Black,
@@ -67,33 +74,10 @@ impl Board {
                     fen::PieceKind::King => Type::King,
                 };
 
-                board.coord_set(Coord { row, col }, Some(Piece { piece, player }));
+                board.square_set(Coord { row, col }, Some(Piece { piece, player }));
             });
 
         board
-    }
-
-    pub fn notation_conversion(row: char, column: i32) -> Option<Coord> {
-        if (row as i32) >= ('a' as i32)
-            && (row as i32) <= ('h' as i32)
-            && column >= 1
-            && column <= 8
-        {
-            Some(Coord {
-                col: (row as i32) - ('a' as i32),
-                row: column - 1 as i32,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn coord_get(&self, coord: Coord) -> &Option<Piece> {
-        &self.board[coord.row as usize][coord.col as usize]
-    }
-
-    fn coord_set(&mut self, coord: Coord, piece: Option<Piece>) {
-        self.board[coord.row as usize][coord.col as usize] = piece;
     }
 
     pub fn print_board(&self, player_pov: Player) {
@@ -113,16 +97,21 @@ impl Board {
         }
     }
 
-    fn is_occupied(&self, location: Coord) -> bool {
-        self.coord_get(location).is_some()
+    fn square_get(&self, coord: Coord) -> &Option<Piece> {
+        &self.board[coord.row as usize][coord.col as usize]
     }
-
-    fn player_at_location(&self, location: Coord) -> Option<Player> {
-        self.coord_get(location).map(|piece| piece.player)
+    fn square_set(&mut self, coord: Coord, piece: Option<Piece>) {
+        self.board[coord.row as usize][coord.col as usize] = piece;
+    }
+    fn square_is_occupied(&self, location: Coord) -> bool {
+        self.square_get(location).is_some()
+    }
+    fn player_at_square(&self, location: Coord) -> Option<Player> {
+        self.square_get(location).map(|piece| piece.player)
     }
 
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
-        let player = self.player_at_location(origin).unwrap();
+        let player = self.player_at_square(origin).unwrap();
 
         directions
             .iter()
@@ -136,7 +125,7 @@ impl Board {
                         break;
                     }
 
-                    if self.player_at_location(pos) == Some(player) {
+                    if self.player_at_square(pos) == Some(player) {
                         break;
                     }
 
@@ -146,7 +135,7 @@ impl Board {
                         promotion: None,
                     });
 
-                    if self.player_at_location(pos) == Some(player.opponent()) {
+                    if self.player_at_square(pos) == Some(player.opponent()) {
                         break;
                     }
                 }
@@ -158,7 +147,7 @@ impl Board {
     }
 
     fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
-        let player = self.player_at_location(origin).unwrap();
+        let player = self.player_at_square(origin).unwrap();
 
         directions
             .iter()
@@ -166,7 +155,7 @@ impl Board {
                 row: origin.row + delta.row,
                 col: origin.col + delta.col,
             })
-            .filter(|&pos| pos.is_valid_location() && self.player_at_location(pos) != Some(player))
+            .filter(|&pos| pos.is_valid_location() && self.player_at_square(pos) != Some(player))
             .map(|pos| Ply {
                 origin,
                 destination: pos,
@@ -176,13 +165,13 @@ impl Board {
     }
 
     fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
-        let player = self.player_at_location(origin).unwrap();
+        let player = self.player_at_square(origin).unwrap();
 
         let dir = player.advancing_direction();
 
         let mut results: Vec<Ply> = vec![];
 
-        if !self.is_occupied(Coord {
+        if !self.square_is_occupied(Coord {
             row: origin.row + dir,
             col: origin.col,
         }) {
@@ -212,14 +201,14 @@ impl Board {
         }
 
         if origin.row % 5 == 1 {
-            if !self.is_occupied(Coord {
-                row: origin.row + dir + dir,
+            if !self.square_is_occupied(Coord {
+                row: origin.row + 2 * dir,
                 col: origin.col,
             }) {
                 results.push(Ply {
                     origin,
                     destination: Coord {
-                        row: origin.row + dir + dir,
+                        row: origin.row + 2 * dir,
                         col: origin.col,
                     },
                     promotion: None,
@@ -231,7 +220,7 @@ impl Board {
     }
 
     fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
-        let player = self.player_at_location(origin).unwrap();
+        let player = self.player_at_square(origin).unwrap();
         let dir = player.advancing_direction();
         let left_capture = Coord {
             row: origin.row + dir,
@@ -245,7 +234,7 @@ impl Board {
 
         // Capture to the left
         if left_capture.is_valid_location()
-            && self.player_at_location(left_capture) == Some(player.opponent())
+            && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if left_capture.row == 7 || left_capture.row == 0 {
                 for promo in Type::PROMOTIONS {
@@ -265,7 +254,7 @@ impl Board {
         }
         // Capture to the right
         if left_capture.is_valid_location()
-            && self.player_at_location(left_capture) == Some(player.opponent())
+            && self.player_at_square(left_capture) == Some(player.opponent())
         {
             if right_capture.row == 7 || right_capture.row == 0 {
                 for promo in Type::PROMOTIONS {
@@ -306,7 +295,7 @@ impl Board {
 
         for row in 0..8 {
             for col in 0..8 {
-                if let Some(piece) = self.coord_get(Coord { row, col }) {
+                if let Some(piece) = self.square_get(Coord { row, col }) {
                     if self.turn == piece.player {
                         moves.extend(self.get_pseudo_legal_moves(Coord { row, col }).iter())
                     }
@@ -322,7 +311,7 @@ impl Board {
     }
 
     fn get_pseudo_legal_moves(&self, location: Coord) -> Vec<Ply> {
-        if let Some(piece_in_square) = self.coord_get(location) {
+        if let Some(piece_in_square) = self.square_get(location) {
             let legal_moves = match piece_in_square.piece {
                 Type::Pawn => vec![
                     self.get_pawn_moves(location),
@@ -350,17 +339,17 @@ impl Board {
     pub fn make_move(&self, ply: Ply) -> Board {
         let mut new_game_state = self.clone();
 
-        let player = self.player_at_location(ply.origin).unwrap();
-        let piece = self.coord_get(ply.origin).unwrap().piece;
+        let player = self.player_at_square(ply.origin).unwrap();
+        let piece = self.square_get(ply.origin).unwrap().piece;
 
         let dir = player.advancing_direction();
 
         // Detecting if move was en passant
         if piece == Type::Pawn
             && ply.origin.col != ply.destination.col
-            && self.coord_get(ply.destination).is_none()
+            && self.square_get(ply.destination).is_none()
         {
-            new_game_state.coord_set(
+            new_game_state.square_set(
                 Coord {
                     row: ply.destination.row - dir,
                     col: ply.destination.col,
@@ -386,8 +375,8 @@ impl Board {
             // new_game_state.coord_set(ply.origin).as_mut().unwrap().piece = new_piece;
         }
 
-        new_game_state.coord_set(ply.destination, *new_game_state.coord_get(ply.origin));
-        new_game_state.coord_set(ply.origin, None);
+        new_game_state.square_set(ply.destination, *new_game_state.square_get(ply.origin));
+        new_game_state.square_set(ply.origin, None);
 
         new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
