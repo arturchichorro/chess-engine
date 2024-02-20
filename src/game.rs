@@ -1,4 +1,4 @@
-use crate::{board::Board, ply::Ply};
+use crate::{board::Board, coord::Coord, piece::Kind, ply::Ply};
 use std::io;
 
 #[derive(Debug, Clone)]
@@ -40,30 +40,38 @@ impl Game {
 
     fn get_user_move(&self) -> Option<Ply> {
         println!("Move?");
-        let mut input = String::new();
 
+        let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
 
-        input
-            .trim()
-            .split(" ")
-            .map(|s| {
-                let mut iter = s.chars();
-                let c1 = iter.next()?;
-                let c2 = iter.next()? as i32 - ('0' as i32);
+        let parse_coord = |input: &str| -> Option<Coord> {
+            let mut iter = input.trim().chars();
+            let c1 = iter.next()?;
+            let c2 = iter.next()? as i32 - ('0' as i32);
 
-                if iter.next().is_none() {
-                    Board::notation_conversion(c1, c2)
-                } else {
-                    None
-                }
-            })
-            .collect::<Option<Vec<_>>>()
-            .filter(|v| v.len() == 2)
-            .map(|v| Ply {
-                origin: v[0],
-                destination: v[1],
-                promotion: None,
-            })
+            if iter.next().is_none() {
+                Board::notation_conversion(c1, c2)
+            } else {
+                None
+            }
+        };
+
+        let parse_promotion = |input: &str| -> Option<Kind> {
+            match input.trim() {
+                "q" => Some(Kind::Queen),
+                "r" => Some(Kind::Rook),
+                "b" => Some(Kind::Bishop),
+                "n" => Some(Kind::Knight),
+                _ => None,
+            }
+        };
+
+        let items = input.trim().split(" ").collect::<Vec<&str>>();
+
+        Some(Ply {
+            origin: parse_coord(items.get(0)?)?,
+            destination: parse_coord(items.get(1)?)?,
+            promotion: items.get(2).and_then(|&s| parse_promotion(s)),
+        })
     }
 }
