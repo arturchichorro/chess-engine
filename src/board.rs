@@ -430,15 +430,15 @@ impl Board {
         // Verify pawns
         let pawn_attack = [Coord::L, Coord::R]
             .iter()
-            .map(|c| origin + *c - player.opponent().advancing_direction())
+            .map(|&c| origin + c - player.opponent().advancing_direction())
             .any(|pos| {
                 self.player_at_square(pos) == Some(player.opponent())
                     && self.kind_at_square(pos) == Some(Kind::Pawn)
             });
 
         // Verify Knights
-        let knight_attack = Coord::LIST_KNIGHT.iter().any(|x| {
-            let pos = origin + *x;
+        let knight_attack = Coord::LIST_KNIGHT.iter().any(|&x| {
+            let pos = origin + x;
             self.player_at_square(pos) == Some(player.opponent())
                 && self.kind_at_square(pos) == Some(Kind::Knight)
         });
