@@ -399,21 +399,27 @@ impl Board {
         let pawn_attack = [Coord::L, Coord::R]
             .iter()
             .map(|&c| origin + c - player.opponent().advancing_direction())
+            .filter(|&c| c.is_valid())
             .any(|pos| {
-                self.player_at_square(pos) == Some(player.opponent())
-                    && self.kind_at_square(pos) == Some(Kind::Pawn)
+                self.square_get(pos)
+                    == &Some(Piece {
+                        kind: Kind::Pawn,
+                        player: player.opponent(),
+                    })
             });
 
         // Verify Knights
-        let knight_attack = Coord::LIST_KNIGHT.iter().any(|&x| {
-            let pos = origin + x;
-            if pos.is_valid() {
-                self.player_at_square(pos) == Some(player.opponent())
-                    && self.kind_at_square(pos) == Some(Kind::Knight)
-            } else {
-                false
-            }
-        });
+        let knight_attack = Coord::LIST_KNIGHT
+            .iter()
+            .map(|&c| origin + c)
+            .filter(|&c| c.is_valid())
+            .any(|pos| {
+                self.square_get(pos)
+                    == &Some(Piece {
+                        kind: Kind::Pawn,
+                        player: player.opponent(),
+                    })
+            });
 
         dbg!(diagonal_attack || knight_attack || cardinal_attack || pawn_attack)
     }
