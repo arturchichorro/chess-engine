@@ -375,9 +375,9 @@ impl Board {
                 .take_while(|&c| self.player_at_square(c) != Some(player))
                 .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
                 .any(|c| {
-                    self.player_at_square(c - dir) == Some(player.opponent())
-                        && (self.kind_at_square(c - dir) == Some(Kind::Bishop)
-                            || self.kind_at_square(c - dir) == Some(Kind::Queen))
+                    self.player_at_square(c) == Some(player.opponent())
+                        && (self.kind_at_square(c) == Some(Kind::Bishop)
+                            || self.kind_at_square(c) == Some(Kind::Queen))
                 })
         });
 
@@ -389,9 +389,9 @@ impl Board {
                 .take_while(|&c| self.player_at_square(c) != Some(player))
                 .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
                 .any(|c| {
-                    self.player_at_square(c - dir) == Some(player.opponent())
-                        && (self.kind_at_square(c - dir) == Some(Kind::Rook)
-                            || self.kind_at_square(c - dir) == Some(Kind::Queen))
+                    self.player_at_square(c) == Some(player.opponent())
+                        && (self.kind_at_square(c) == Some(Kind::Rook)
+                            || self.kind_at_square(c) == Some(Kind::Queen))
                 })
         });
 
@@ -407,8 +407,12 @@ impl Board {
         // Verify Knights
         let knight_attack = Coord::LIST_KNIGHT.iter().any(|&x| {
             let pos = origin + x;
-            self.player_at_square(pos) == Some(player.opponent())
-                && self.kind_at_square(pos) == Some(Kind::Knight)
+            if pos.is_valid() {
+                self.player_at_square(pos) == Some(player.opponent())
+                    && self.kind_at_square(pos) == Some(Kind::Knight)
+            } else {
+                false
+            }
         });
 
         dbg!(diagonal_attack || knight_attack || cardinal_attack || pawn_attack)
