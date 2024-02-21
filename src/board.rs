@@ -154,38 +154,6 @@ impl Board {
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
-        // directions
-        //     .iter()
-        //     .map(|dir| {
-        //         let mut plys = vec![];
-
-        //         for i in 1.. {
-        //             let pos = origin + (*dir) * i;
-
-        //             if !pos.is_valid() {
-        //                 break;
-        //             }
-
-        //             if self.player_at_square(pos) == Some(player) {
-        //                 break;
-        //             }
-
-        //             plys.push(Ply {
-        //                 origin,
-        //                 destination: pos,
-        //                 promotion: None,
-        //             });
-
-        //             if self.player_at_square(pos) == Some(player.opponent()) {
-        //                 break;
-        //             }
-        //         }
-
-        //         plys.into_iter()
-        //     })
-        //     .flatten()
-        //     .collect()
-
         directions
             .iter()
             .map(|&dir| {
