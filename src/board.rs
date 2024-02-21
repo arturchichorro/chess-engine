@@ -407,8 +407,12 @@ impl Board {
         // Verify Knights
         let knight_attack = Coord::LIST_KNIGHT.iter().any(|&x| {
             let pos = origin + x;
-            self.player_at_square(pos) == Some(player.opponent())
-                && self.kind_at_square(pos) == Some(Kind::Knight)
+            if pos.is_valid() {
+                self.player_at_square(pos) == Some(player.opponent())
+                    && self.kind_at_square(pos) == Some(Kind::Knight)
+            } else {
+                false
+            }
         });
 
         dbg!(diagonal_attack || knight_attack || cardinal_attack || pawn_attack)
