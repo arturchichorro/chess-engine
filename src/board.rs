@@ -129,7 +129,11 @@ impl Board {
                 Kind::Queen => {
                     self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
                 }
-                Kind::King => self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                Kind::King => vec![
+                    self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                    self.get_castling_moves(),
+                ]
+                .concat(),
             }
         } else {
             vec![]
@@ -222,8 +226,8 @@ impl Board {
         }
 
         // Update castle permissions
-        match piece.kind {
-            Kind::King => match piece.player {
+        if piece.kind == Kind::King {
+            match piece.player {
                 Player::Black => {
                     new_game_state.black_can_oo = false;
                     new_game_state.black_can_ooo = false;
@@ -232,24 +236,38 @@ impl Board {
                     new_game_state.white_can_oo = false;
                     new_game_state.white_can_ooo = false;
                 }
-            },
-            Kind::Rook => match ply.origin {
-                Coord { row, col: 0 } if row == Player::White.home_row() => {
-                    new_game_state.white_can_ooo = false
-                }
-                Coord { row, col: 7 } if row == Player::White.home_row() => {
-                    new_game_state.white_can_oo = false
-                }
-                Coord { row, col: 0 } if row == Player::Black.home_row() => {
-                    new_game_state.black_can_ooo = false
-                }
-                Coord { row, col: 7 } if row == Player::Black.home_row() => {
-                    new_game_state.black_can_oo = false
-                }
-                _ => (),
-            },
-            _ => (),
+            }
         }
+
+        [
+            (
+                &mut new_game_state.white_can_ooo,
+                Player::White.home_row(),
+                0,
+            ),
+            (
+                &mut new_game_state.white_can_oo,
+                Player::White.home_row(),
+                7,
+            ),
+            (
+                &mut new_game_state.black_can_ooo,
+                Player::Black.home_row(),
+                0,
+            ),
+            (
+                &mut new_game_state.black_can_oo,
+                Player::Black.home_row(),
+                7,
+            ),
+        ]
+        .into_iter()
+        .for_each(|(castle_perm, row, col)| {
+            let coord = Coord { row, col };
+            if ply.origin == coord || ply.destination == coord {
+                *castle_perm = false;
+            }
+        });
 
         // Set piece (including promotions) on new square
         new_game_state.square_set(
@@ -268,7 +286,7 @@ impl Board {
             self.is_square_attacked(ply.destination, Player::White)
         );
         // Change turn and return new game state
-        // new_game_state.turn = new_game_state.turn.opponent();
+        new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
     }
 
@@ -422,9 +440,9 @@ impl Board {
         match player {
             Player::White => {
                 if self.white_can_oo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player)
-                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player)
-                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player)
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player.opponent())
                     && !self.is_square_occupied(Coord { row: 0, col: 5 })
                     && !self.is_square_occupied(Coord { row: 0, col: 6 })
                 {
@@ -435,9 +453,9 @@ impl Board {
                     })
                 }
                 if self.white_can_ooo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player)
-                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player)
-                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player)
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player.opponent())
                     && !self.is_square_occupied(Coord { row: 0, col: 1 })
                     && !self.is_square_occupied(Coord { row: 0, col: 2 })
                     && !self.is_square_occupied(Coord { row: 0, col: 3 })
@@ -451,9 +469,9 @@ impl Board {
             }
             Player::Black => {
                 if self.black_can_oo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player)
-                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player)
-                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player)
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player.opponent())
                     && !self.is_square_occupied(Coord { row: 7, col: 5 })
                     && !self.is_square_occupied(Coord { row: 7, col: 6 })
                 {
@@ -464,9 +482,9 @@ impl Board {
                     })
                 }
                 if self.black_can_ooo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player)
-                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player)
-                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player)
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player.opponent())
                     && !self.is_square_occupied(Coord { row: 7, col: 1 })
                     && !self.is_square_occupied(Coord { row: 7, col: 2 })
                     && !self.is_square_occupied(Coord { row: 7, col: 3 })
@@ -484,8 +502,13 @@ impl Board {
     }
 
     pub fn arbiter(&self, ply: &Ply) -> bool {
-        let legal_moves = self.get_pseudo_legal_moves(ply.origin);
+        // Verifies if there's a piece in square, and if it's the right turn
+        if let Some(piece) = self.square_get(ply.origin) {
+            if piece.player != self.turn {
+                return false;
+            }
+        }
 
-        legal_moves.contains(ply)
+        self.get_pseudo_legal_moves(ply.origin).contains(ply)
     }
 }
