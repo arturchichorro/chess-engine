@@ -107,7 +107,7 @@ impl Board {
     fn square_set(&mut self, coord: Coord, piece: Option<Piece>) {
         self.board[coord.row as usize][coord.col as usize] = piece;
     }
-    fn square_is_occupied(&self, location: Coord) -> bool {
+    fn is_square_occupied(&self, location: Coord) -> bool {
         self.square_get(location).is_some()
     }
     fn player_at_square(&self, location: Coord) -> Option<Player> {
@@ -238,6 +238,10 @@ impl Board {
         // Remove piece from old square
         new_game_state.square_set(ply.origin, None);
 
+        println!(
+            "{:?}",
+            self.is_square_attacked(ply.destination, Player::White)
+        );
         // Change turn and return new game state
         // new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
@@ -252,7 +256,7 @@ impl Board {
 
         let mut results: Vec<Ply> = vec![];
 
-        if !self.square_is_occupied(origin + dir) {
+        if !self.is_square_occupied(origin + dir) {
             if origin.row == 0 || origin.row == 7 {
                 for promo in Kind::PROMOTIONS {
                     results.push(Ply {
@@ -273,7 +277,7 @@ impl Board {
         }
 
         if origin.row % 5 == 1 {
-            if !self.square_is_occupied(origin + 2 * dir) {
+            if !self.is_square_occupied(origin + 2 * dir) {
                 results.push(Ply {
                     origin,
                     destination: origin + 2 * dir,
@@ -393,11 +397,72 @@ impl Board {
                 && self.kind_at_square(pos) == Some(Kind::Knight)
         });
 
-        diagonal_attack || knight_attack || cardinal_attack || pawn_attack
+        dbg!(diagonal_attack || knight_attack || cardinal_attack || pawn_attack)
     }
 
-    fn get_castling_moves(&self, origin: Coord) -> Vec<Ply> {
-        todo!()
+    fn get_castling_moves(&self) -> Vec<Ply> {
+        let player = self.turn;
+        let mut results: Vec<Ply> = vec![];
+
+        // Como reduzir estes dois bocados de código quase idênticos?
+        match player {
+            Player::White => {
+                if self.white_can_oo
+                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player)
+                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player)
+                    && !self.is_square_occupied(Coord { row: 0, col: 5 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 6 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 0, col: 4 },
+                        destination: Coord { row: 0, col: 6 },
+                        promotion: None,
+                    })
+                }
+                if self.white_can_ooo
+                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player)
+                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player)
+                    && !self.is_square_occupied(Coord { row: 0, col: 1 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 2 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 3 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 0, col: 4 },
+                        destination: Coord { row: 0, col: 2 },
+                        promotion: None,
+                    })
+                }
+            }
+            Player::Black => {
+                if self.black_can_oo
+                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player)
+                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player)
+                    && !self.is_square_occupied(Coord { row: 7, col: 5 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 6 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 7, col: 4 },
+                        destination: Coord { row: 7, col: 6 },
+                        promotion: None,
+                    })
+                }
+                if self.black_can_ooo
+                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player)
+                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player)
+                    && !self.is_square_occupied(Coord { row: 7, col: 1 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 2 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 3 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 7, col: 4 },
+                        destination: Coord { row: 7, col: 2 },
+                        promotion: None,
+                    })
+                }
+            }
+        }
+
+        results
     }
 
     pub fn arbiter(&self, ply: &Ply) -> bool {
