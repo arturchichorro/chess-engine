@@ -210,7 +210,7 @@ impl Board {
         let piece = self.square_get(ply.origin).unwrap();
         let dir = piece.player.advancing_direction();
 
-        // Detect if move was en passant abd remove the captured pawn
+        // Detect if move was en passant and remove the captured pawn
         if piece.kind == Kind::Pawn
             && ply.origin.col != ply.destination.col
             && self.square_get(ply.destination).is_none()
@@ -225,6 +225,56 @@ impl Board {
             } else {
                 None
             };
+
+        // Detect if move was castle and move rook to correct position
+        if piece.kind == Kind::King
+            && (ply.destination == ply.origin + 2 * Coord::R
+                || ply.destination == ply.origin + 2 * Coord::L)
+        {
+            if ply.destination.col > ply.origin.col {
+                new_game_state.square_set(
+                    ply.destination + Coord::L,
+                    Some(Piece {
+                        kind: Kind::Rook,
+                        player: piece.player,
+                    }),
+                );
+                new_game_state.square_set(ply.destination + Coord::R, None);
+            } else {
+                new_game_state.square_set(
+                    ply.destination + Coord::R,
+                    Some(Piece {
+                        kind: Kind::Rook,
+                        player: piece.player,
+                    }),
+                );
+                new_game_state.square_set(ply.destination + 2 * Coord::L, None);
+            }
+        }
+
+        // Update castle permissions
+        if piece.kind == Kind::King {
+            match piece.player {
+                Player::Black => {
+                    new_game_state.black_can_oo = false;
+                    new_game_state.black_can_ooo = false;
+                }
+                Player::White => {
+                    new_game_state.white_can_oo = false;
+                    new_game_state.white_can_ooo = false;
+                }
+            }
+        } else if piece.kind == Kind::Rook && ply.origin.col == 0 {
+            match piece.player {
+                Player::Black => new_game_state.black_can_ooo = false,
+                Player::White => new_game_state.white_can_ooo = false,
+            }
+        } else if piece.kind == Kind::Rook && ply.origin.col == 7 {
+            match piece.player {
+                Player::Black => new_game_state.black_can_oo = false,
+                Player::White => new_game_state.white_can_oo = false,
+            }
+        }
 
         // Set piece (including promotions) on new square
         new_game_state.square_set(
@@ -408,6 +458,7 @@ impl Board {
         match player {
             Player::White => {
                 if self.white_can_oo
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player)
                     && !self.is_square_attacked(Coord { row: 0, col: 5 }, player)
                     && !self.is_square_attacked(Coord { row: 0, col: 6 }, player)
                     && !self.is_square_occupied(Coord { row: 0, col: 5 })
@@ -420,6 +471,7 @@ impl Board {
                     })
                 }
                 if self.white_can_ooo
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player)
                     && !self.is_square_attacked(Coord { row: 0, col: 2 }, player)
                     && !self.is_square_attacked(Coord { row: 0, col: 3 }, player)
                     && !self.is_square_occupied(Coord { row: 0, col: 1 })
@@ -435,6 +487,7 @@ impl Board {
             }
             Player::Black => {
                 if self.black_can_oo
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player)
                     && !self.is_square_attacked(Coord { row: 7, col: 5 }, player)
                     && !self.is_square_attacked(Coord { row: 7, col: 6 }, player)
                     && !self.is_square_occupied(Coord { row: 7, col: 5 })
@@ -447,6 +500,7 @@ impl Board {
                     })
                 }
                 if self.black_can_ooo
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player)
                     && !self.is_square_attacked(Coord { row: 7, col: 2 }, player)
                     && !self.is_square_attacked(Coord { row: 7, col: 3 }, player)
                     && !self.is_square_occupied(Coord { row: 7, col: 1 })
