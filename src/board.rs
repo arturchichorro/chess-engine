@@ -367,6 +367,27 @@ impl Board {
     }
 
     fn is_square_attacked(&self, origin: Coord, player: Player) -> bool {
+        let attacks =
+            [Coord::LIST_CARDINAL, Coord::LIST_DIAGONAL]
+                .iter()
+                .any(|&attack_directions| {
+                    attack_directions.iter().any(|&dir| {
+                        (1..)
+                            .map(move |i| origin + dir * i)
+                            .take_while(|&c| c.is_valid())
+                            .take_while(|&c| self.player_at_square(c) != Some(player))
+                            .take_while(move |&c| {
+                                self.player_at_square(c - dir) != Some(player.opponent())
+                            })
+                            .any(|c| {
+                                self.player_at_square(c) == Some(player.opponent())
+                                    && (self.kind_at_square(c) == Some(Kind::Bishop)
+                                        || self.kind_at_square(c) == Some(Kind::Queen)
+                                        || self.kind_at_square(c) == Some(Kind::Rook))
+                            })
+                    })
+                });
+
         // Verify diagonals
         let diagonal_attack = Coord::LIST_DIAGONAL.iter().any(|&dir| {
             (1..)
