@@ -113,6 +113,9 @@ impl Board {
     fn player_at_square(&self, location: Coord) -> Option<Player> {
         self.square_get(location).map(|piece| piece.player)
     }
+    fn kind_at_square(&self, location: Coord) -> Option<Kind> {
+        self.square_get(location).map(|piece| piece.kind)
+    }
 
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.square_get(coord) {
@@ -291,30 +294,30 @@ impl Board {
             .map(|&delta| origin + dir + delta)
             .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
             .map(|pos| {
-                if pos.row == 7 || pos.row == 0 {
-                    Kind::PROMOTIONS
-                        .iter()
-                        .map(|&promo| Ply {
-                            origin,
-                            destination: pos,
-                            promotion: Some(promo),
-                        })
-                        .collect()
+                let x = if pos.row == 7 || pos.row == 0 {
+                    [
+                        Some(Kind::Queen),
+                        Some(Kind::Rook),
+                        Some(Kind::Bishop),
+                        Some(Kind::Knight),
+                    ]
+                    .as_slice()
                 } else {
-                    // TODO: remove vector
-                    vec![Ply {
-                        origin,
-                        destination: pos,
-                        promotion: None,
-                    }]
-                }
+                    [None].as_slice()
+                };
+
+                x.iter().map(move |&promo| Ply {
+                    origin,
+                    destination: pos,
+                    promotion: promo,
+                })
             })
             .flatten()
             .collect();
 
         // En passant
         if self.en_passant_square.is_some() {
-            let ep_square = self.en_passant_square.unwrap();
+            let ep_square = self.en_passant_square.unwrap(); // TODO
             if (origin + dir).row == ep_square.row {
                 if (origin.col + 1 == ep_square.col) || (origin.col - 1 == ep_square.col) {
                     results.push(Ply {
@@ -343,6 +346,54 @@ impl Board {
         }
 
         todo!()
+    }
+
+    fn is_square_attacked(&self, origin: Coord, player: Player) -> bool {
+        // Verify diagonals
+        let diagonal_attack = Coord::LIST_DIAGONAL.iter().any(|&dir| {
+            (1..)
+                .map(move |i| origin + dir * i)
+                .take_while(|&c| c.is_valid())
+                .take_while(|&c| self.player_at_square(c) != Some(player))
+                .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
+                .any(|c| {
+                    self.player_at_square(c - dir) == Some(player.opponent())
+                        && (self.kind_at_square(c - dir) == Some(Kind::Bishop)
+                            || self.kind_at_square(c - dir) == Some(Kind::Queen))
+                })
+        });
+
+        // Verify horizontal and vertical lines
+        let cardinal_attack = Coord::LIST_CARDINAL.iter().any(|&dir| {
+            (1..)
+                .map(move |i| origin + dir * i)
+                .take_while(|&c| c.is_valid())
+                .take_while(|&c| self.player_at_square(c) != Some(player))
+                .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
+                .any(|c| {
+                    self.player_at_square(c - dir) == Some(player.opponent())
+                        && (self.kind_at_square(c - dir) == Some(Kind::Rook)
+                            || self.kind_at_square(c - dir) == Some(Kind::Queen))
+                })
+        });
+
+        // Verify pawns
+        let pawn_attack = [Coord::L, Coord::R]
+            .iter()
+            .map(|c| origin + *c - player.opponent().advancing_direction())
+            .any(|pos| {
+                self.player_at_square(pos) == Some(player.opponent())
+                    && self.kind_at_square(pos) == Some(Kind::Pawn)
+            });
+
+        // Verify Knights
+        let knight_attack = Coord::LIST_KNIGHT.iter().any(|x| {
+            let pos = origin + *x;
+            self.player_at_square(pos) == Some(player.opponent())
+                && self.kind_at_square(pos) == Some(Kind::Knight)
+        });
+
+        diagonal_attack || knight_attack || cardinal_attack || pawn_attack
     }
 
     fn get_castling_moves(&self, origin: Coord) -> Vec<Ply> {
