@@ -298,23 +298,19 @@ impl Board {
             .map(|&delta| origin + dir + delta)
             .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
             .map(|pos| {
-                let x = if pos.row == 7 || pos.row == 0 {
-                    [
-                        Some(Kind::Queen),
-                        Some(Kind::Rook),
-                        Some(Kind::Bishop),
-                        Some(Kind::Knight),
-                    ]
-                    .as_slice()
+                if pos.row == 7 || pos.row == 0 {
+                    Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
+                        origin,
+                        destination: pos,
+                        promotion: Some(promo),
+                    })) as Box<dyn Iterator<Item = Ply>>
                 } else {
-                    [None].as_slice()
-                };
-
-                x.iter().map(move |&promo| Ply {
-                    origin,
-                    destination: pos,
-                    promotion: promo,
-                })
+                    Box::new(std::iter::once(Ply {
+                        origin,
+                        destination: pos,
+                        promotion: None,
+                    })) as Box<dyn Iterator<Item = Ply>>
+                }
             })
             .flatten()
             .collect();
