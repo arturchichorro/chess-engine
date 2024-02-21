@@ -309,11 +309,10 @@ impl Board {
 
     fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
-        let dir = player.advancing_direction();
 
         let mut results: Vec<Ply> = [Coord::L, Coord::R]
             .iter()
-            .map(|&delta| origin + dir + delta)
+            .map(|&c| origin + c + player.advancing_direction())
             .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
             .map(|pos| {
                 if pos.row == 7 || pos.row == 0 {
@@ -334,13 +333,14 @@ impl Board {
             .collect();
 
         // En passant
-        if self.en_passant_square.is_some() {
-            let ep_square = self.en_passant_square.unwrap(); // TODO
-            if (origin + dir).row == ep_square.row {
-                if (origin.col + 1 == ep_square.col) || (origin.col - 1 == ep_square.col) {
+        if let Some(en_passant_square) = self.en_passant_square {
+            if (origin + player.advancing_direction()).row == en_passant_square.row {
+                if (origin.col + 1 == en_passant_square.col)
+                    || (origin.col - 1 == en_passant_square.col)
+                {
                     results.push(Ply {
                         origin,
-                        destination: ep_square,
+                        destination: en_passant_square,
                         promotion: None,
                     })
                 }
@@ -366,83 +366,45 @@ impl Board {
         todo!()
     }
 
-    fn is_square_attacked(&self, origin: Coord, player: Player) -> bool {
-        let attacks =
-            [Coord::LIST_CARDINAL, Coord::LIST_DIAGONAL]
+    fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
+        Coord::LIST_CARDINAL
+            .iter()
+            .map(|c| (c, Kind::Rook))
+            .chain(Coord::LIST_DIAGONAL.iter().map(|c| (c, Kind::Bishop)))
+            .any(|(&dir, piece)| {
+                (1..)
+                    .map(move |i| origin + dir * i)
+                    .take_while(|&c| c.is_valid())
+                    .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
+                    .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
+                    .any(|c| {
+                        self.player_at_square(c) == Some(by_player)
+                            && (self.kind_at_square(c) == Some(piece)
+                                || self.kind_at_square(c) == Some(Kind::Queen))
+                    })
+            })
+            || [Coord::L, Coord::R]
                 .iter()
-                .any(|&attack_directions| {
-                    attack_directions.iter().any(|&dir| {
-                        (1..)
-                            .map(move |i| origin + dir * i)
-                            .take_while(|&c| c.is_valid())
-                            .take_while(|&c| self.player_at_square(c) != Some(player))
-                            .take_while(move |&c| {
-                                self.player_at_square(c - dir) != Some(player.opponent())
-                            })
-                            .any(|c| {
-                                self.player_at_square(c) == Some(player.opponent())
-                                    && (self.kind_at_square(c) == Some(Kind::Bishop)
-                                        || self.kind_at_square(c) == Some(Kind::Queen)
-                                        || self.kind_at_square(c) == Some(Kind::Rook))
-                            })
-                    })
-                });
-
-        // Verify diagonals
-        let diagonal_attack = Coord::LIST_DIAGONAL.iter().any(|&dir| {
-            (1..)
-                .map(move |i| origin + dir * i)
-                .take_while(|&c| c.is_valid())
-                .take_while(|&c| self.player_at_square(c) != Some(player))
-                .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
-                .any(|c| {
-                    self.player_at_square(c) == Some(player.opponent())
-                        && (self.kind_at_square(c) == Some(Kind::Bishop)
-                            || self.kind_at_square(c) == Some(Kind::Queen))
+                .map(|&c| origin + c - by_player.advancing_direction())
+                .filter(|&c| c.is_valid())
+                .any(|pos| {
+                    self.square_get(pos)
+                        == &Some(Piece {
+                            kind: Kind::Pawn,
+                            player: by_player,
+                        })
                 })
-        });
-
-        // Verify horizontal and vertical lines
-        let cardinal_attack = Coord::LIST_CARDINAL.iter().any(|&dir| {
-            (1..)
-                .map(move |i| origin + dir * i)
-                .take_while(|&c| c.is_valid())
-                .take_while(|&c| self.player_at_square(c) != Some(player))
-                .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
-                .any(|c| {
-                    self.player_at_square(c) == Some(player.opponent())
-                        && (self.kind_at_square(c) == Some(Kind::Rook)
-                            || self.kind_at_square(c) == Some(Kind::Queen))
+            || Coord::LIST_KNIGHT
+                .iter()
+                .map(|&c| origin + c)
+                .filter(|&c| c.is_valid())
+                .any(|pos| {
+                    self.square_get(pos)
+                        == &Some(Piece {
+                            kind: Kind::Knight,
+                            player: by_player,
+                        })
                 })
-        });
-
-        // Verify pawns
-        let pawn_attack = [Coord::L, Coord::R]
-            .iter()
-            .map(|&c| origin + c - player.opponent().advancing_direction())
-            .filter(|&c| c.is_valid())
-            .any(|pos| {
-                self.square_get(pos)
-                    == &Some(Piece {
-                        kind: Kind::Pawn,
-                        player: player.opponent(),
-                    })
-            });
-
-        // Verify Knights
-        let knight_attack = Coord::LIST_KNIGHT
-            .iter()
-            .map(|&c| origin + c)
-            .filter(|&c| c.is_valid())
-            .any(|pos| {
-                self.square_get(pos)
-                    == &Some(Piece {
-                        kind: Kind::Pawn,
-                        player: player.opponent(),
-                    })
-            });
-
-        dbg!(diagonal_attack || knight_attack || cardinal_attack || pawn_attack)
     }
 
     fn get_castling_moves(&self) -> Vec<Ply> {
