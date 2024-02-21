@@ -22,6 +22,13 @@ impl Player {
             Player::Black => Coord::D,
         }
     }
+
+    pub fn home_row(&self) -> i32 {
+        match self {
+            Player::White => 0,
+            Player::Black => 7,
+        }
+    }
 }
 
 impl Default for Player {

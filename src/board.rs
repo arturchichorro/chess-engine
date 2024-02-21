@@ -195,11 +195,8 @@ impl Board {
             };
 
         // Detect if move was castle and move rook to correct position
-        if piece.kind == Kind::King
-            && (ply.destination == ply.origin + 2 * Coord::R
-                || ply.destination == ply.origin + 2 * Coord::L)
-        {
-            if ply.destination.col > ply.origin.col {
+        if piece.kind == Kind::King {
+            if ply.destination == ply.origin + 2 * Coord::R {
                 new_game_state.square_set(
                     ply.destination + Coord::L,
                     Some(Piece {
@@ -207,8 +204,11 @@ impl Board {
                         player: piece.player,
                     }),
                 );
+
                 new_game_state.square_set(ply.destination + Coord::R, None);
-            } else {
+            }
+
+            if ply.destination == ply.origin + 2 * Coord::L {
                 new_game_state.square_set(
                     ply.destination + Coord::R,
                     Some(Piece {
@@ -216,13 +216,14 @@ impl Board {
                         player: piece.player,
                     }),
                 );
+
                 new_game_state.square_set(ply.destination + 2 * Coord::L, None);
             }
         }
 
         // Update castle permissions
-        if piece.kind == Kind::King {
-            match piece.player {
+        match piece.kind {
+            Kind::King => match piece.player {
                 Player::Black => {
                     new_game_state.black_can_oo = false;
                     new_game_state.black_can_ooo = false;
@@ -231,17 +232,23 @@ impl Board {
                     new_game_state.white_can_oo = false;
                     new_game_state.white_can_ooo = false;
                 }
-            }
-        } else if piece.kind == Kind::Rook && ply.origin.col == 0 {
-            match piece.player {
-                Player::Black => new_game_state.black_can_ooo = false,
-                Player::White => new_game_state.white_can_ooo = false,
-            }
-        } else if piece.kind == Kind::Rook && ply.origin.col == 7 {
-            match piece.player {
-                Player::Black => new_game_state.black_can_oo = false,
-                Player::White => new_game_state.white_can_oo = false,
-            }
+            },
+            Kind::Rook => match ply.origin {
+                Coord { row, col: 0 } if row == Player::White.home_row() => {
+                    new_game_state.white_can_ooo = false
+                }
+                Coord { row, col: 7 } if row == Player::White.home_row() => {
+                    new_game_state.white_can_oo = false
+                }
+                Coord { row, col: 0 } if row == Player::Black.home_row() => {
+                    new_game_state.black_can_ooo = false
+                }
+                Coord { row, col: 7 } if row == Player::Black.home_row() => {
+                    new_game_state.black_can_oo = false
+                }
+                _ => (),
+            },
+            _ => (),
         }
 
         // Set piece (including promotions) on new square
