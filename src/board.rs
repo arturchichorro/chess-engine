@@ -235,6 +235,13 @@ impl Board {
         let piece = self.square_get(ply.origin).unwrap();
         let dir = piece.player.advancing_direction();
 
+        // Detect if move was capture or pawn push and update half_move clock
+        if piece.kind == Kind::Pawn || self.is_square_occupied(ply.destination) {
+            new_game_state.half_move_clock = 0;
+        } else {
+            new_game_state.half_move_clock += 1;
+        }
+
         // Detect if move was en passant and remove the captured pawn
         if piece.kind == Kind::Pawn
             && ply.origin.col != ply.destination.col
