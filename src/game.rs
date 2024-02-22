@@ -74,4 +74,8 @@ impl Game {
             promotion: items.get(2).and_then(|&s| parse_promotion(s)),
         })
     }
+
+    fn verify_threefold(&self) -> bool {
+        todo!()
+    }
 }

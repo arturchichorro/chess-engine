@@ -148,31 +148,35 @@ impl Board {
 
         pseudo_legal_moves.iter().for_each(|m| {
             let pos_after_move = self.make_move(*m);
-            for row in 0..8 {
-                for col in 0..8 {
-                    if pos_after_move.board[row][col]
-                        == Some(Piece {
-                            kind: Kind::King,
-                            player: current_turn,
-                        })
-                    {
-                        if !pos_after_move.is_square_attacked(
-                            Coord {
-                                row: row as i32,
-                                col: col as i32,
-                            },
-                            pos_after_move.turn,
-                        ) {
-                            results.push(*m);
-                            break;
-                        };
-                    }
-                }
+
+            if let Some(king_pos) = self.find_king(current_turn) {
+                if !pos_after_move.is_square_attacked(king_pos, pos_after_move.turn) {
+                    results.push(*m);
+                };
             }
         });
-        dbg!(results)
+        results
     }
 
+    fn find_king(&self, player: Player) -> Option<Coord> {
+        for row in 0..8 {
+            for col in 0..8 {
+                if self.board[row][col]
+                    == Some(Piece {
+                        kind: Kind::King,
+                        player,
+                    })
+                {
+                    return Some(Coord {
+                        row: row as i32,
+                        col: col as i32,
+                    });
+                }
+            }
+        }
+
+        None
+    }
     // Gives all posible moves in a position
     fn get_all_moves(&self) -> Vec<Ply> {
         let mut moves: Vec<Ply> = vec![];
@@ -181,13 +185,12 @@ impl Board {
             for col in 0..8 {
                 if let Some(piece) = self.square_get(Coord { row, col }) {
                     if self.turn == piece.player {
-                        moves.extend(self.get_pseudo_legal_moves(Coord { row, col }).iter())
+                        moves.extend(self.get_legal_moves(Coord { row, col }))
                     }
                 }
             }
         }
-
-        todo!()
+        moves
     }
 
     fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
@@ -538,5 +541,33 @@ impl Board {
         }
 
         self.get_legal_moves(ply.origin).contains(ply)
+    }
+
+    pub fn verify_status(&self) -> &str {
+        // Threefold Repetition => return "draw" (implemented in game.rs)
+
+        // Verify if there are no legal moves in a position. Case is either checkmate or stalemate
+        if self.get_all_moves().is_empty() {
+            if let Some(king_pos) = self.find_king(self.turn) {
+                if self.is_square_attacked(king_pos, self.turn.opponent()) {
+                    // Checkmate case
+                    match self.turn {
+                        Player::Black => return "w_win",
+                        Player::White => return "b_win",
+                    }
+                } else {
+                    // Stalemate case
+                    return "draw";
+                }
+            } else {
+                return "invalid";
+            }
+        }
+
+        if self.half_move_clock == 100 {
+            return "draw";
+        }
+
+        "ongoing"
     }
 }
