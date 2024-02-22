@@ -19,22 +19,52 @@ impl Game {
 
     pub fn play(&mut self) {
         loop {
-            self.states
-                .last()
-                .unwrap()
-                .print_board(self.states.last().unwrap().turn);
+            let current_pos = self.states.last().unwrap();
+
+            self.states.last().unwrap().print_board(current_pos.turn);
 
             let Some(ply) = self.get_user_move() else {
                 println!("Invalid input text.");
                 continue;
             };
 
-            if !self.states.last().unwrap().arbiter(&ply) {
+            if !current_pos.arbiter(&ply) {
                 println!("That move is not allowed, idiot.");
                 continue;
             }
 
-            self.states.push(self.states.last().unwrap().make_move(ply));
+            self.states.push(current_pos.make_move(ply));
+            let next_pos = self.states.last().unwrap();
+
+            if self.verify_threefold_repetition() {
+                next_pos.print_board(next_pos.turn);
+                println!("Draw");
+                break;
+            }
+
+            match dbg!(next_pos.verify_status()) {
+                crate::status::Status::Invalid => {
+                    next_pos.print_board(next_pos.turn);
+                    println!("Invalid position");
+                    break;
+                }
+                crate::status::Status::BWin => {
+                    next_pos.print_board(next_pos.turn);
+                    println!("Checkmate: black wins");
+                    break;
+                }
+                crate::status::Status::WWin => {
+                    next_pos.print_board(next_pos.turn);
+                    println!("Checkmate: white wins");
+                    break;
+                }
+                crate::status::Status::Draw => {
+                    next_pos.print_board(next_pos.turn);
+                    println!("Draw");
+                    break;
+                }
+                crate::status::Status::Ongoing => continue,
+            }
         }
     }
 
@@ -75,7 +105,18 @@ impl Game {
         })
     }
 
-    fn verify_threefold(&self) -> bool {
-        todo!()
+    fn verify_threefold_repetition(&self) -> bool {
+        let current_state = match self.states.last() {
+            Some(state) => state,
+            None => return false,
+        };
+
+        self.states
+            .iter()
+            .rev()
+            .step_by(2)
+            .filter(|&x| x == current_state)
+            .count()
+            >= 3
     }
 }

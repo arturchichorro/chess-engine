@@ -3,9 +3,10 @@ use crate::{
     piece::{Kind, Piece},
     player::Player,
     ply::Ply,
+    status::Status,
 };
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Board {
     pub turn: Player,
 
@@ -149,7 +150,7 @@ impl Board {
         pseudo_legal_moves.iter().for_each(|m| {
             let pos_after_move = self.make_move(*m);
 
-            if let Some(king_pos) = self.find_king(current_turn) {
+            if let Some(king_pos) = pos_after_move.find_king(current_turn) {
                 if !pos_after_move.is_square_attacked(king_pos, pos_after_move.turn) {
                     results.push(*m);
                 };
@@ -550,31 +551,26 @@ impl Board {
         self.get_legal_moves(ply.origin).contains(ply)
     }
 
-    pub fn verify_status(&self) -> &str {
-        // Threefold Repetition => return "draw" (implemented in game.rs)
-
-        // Verify if there are no legal moves in a position. Case is either checkmate or stalemate
-        if self.get_all_moves().is_empty() {
-            if let Some(king_pos) = self.find_king(self.turn) {
-                if self.is_square_attacked(king_pos, self.turn.opponent()) {
-                    // Checkmate case
-                    match self.turn {
-                        Player::Black => return "w_win",
-                        Player::White => return "b_win",
-                    }
-                } else {
-                    // Stalemate case
-                    return "draw";
-                }
-            } else {
-                return "invalid";
-            }
-        }
+    pub fn verify_status(&self) -> Status {
+        let Some(king_pos) = self.find_king(self.turn) else {
+            return Status::Invalid;
+        };
 
         if self.half_move_clock == 100 {
-            return "draw";
+            return Status::Draw;
         }
 
-        "ongoing"
+        if !dbg!(self.get_all_moves()).is_empty() {
+            return Status::Ongoing;
+        }
+
+        if !self.is_square_attacked(king_pos, self.turn.opponent()) {
+            return Status::Draw;
+        }
+
+        match self.turn {
+            Player::Black => Status::WWin,
+            Player::White => Status::BWin,
+        }
     }
 }

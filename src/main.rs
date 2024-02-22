@@ -6,6 +6,7 @@ mod game;
 mod piece;
 mod player;
 mod ply;
+mod status;
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
