@@ -140,6 +140,56 @@ impl Board {
         }
     }
 
+    // Returns a vector with all the legal moves possible for the piece at position coord
+    fn get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+        let pseudo_legal_moves = self.get_pseudo_legal_moves(coord);
+        let current_turn = self.turn;
+        let mut results: Vec<Ply> = vec![];
+
+        pseudo_legal_moves.iter().for_each(|m| {
+            let pos_after_move = self.make_move(*m);
+            for row in 0..8 {
+                for col in 0..8 {
+                    if pos_after_move.board[row][col]
+                        == Some(Piece {
+                            kind: Kind::King,
+                            player: current_turn,
+                        })
+                    {
+                        if !pos_after_move.is_square_attacked(
+                            Coord {
+                                row: row as i32,
+                                col: col as i32,
+                            },
+                            pos_after_move.turn,
+                        ) {
+                            results.push(*m);
+                            break;
+                        };
+                    }
+                }
+            }
+        });
+        dbg!(results)
+    }
+
+    // Gives all posible moves in a position
+    fn get_all_moves(&self) -> Vec<Ply> {
+        let mut moves: Vec<Ply> = vec![];
+
+        for row in 0..8 {
+            for col in 0..8 {
+                if let Some(piece) = self.square_get(Coord { row, col }) {
+                    if self.turn == piece.player {
+                        moves.extend(self.get_pseudo_legal_moves(Coord { row, col }).iter())
+                    }
+                }
+            }
+        }
+
+        todo!()
+    }
+
     fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
@@ -281,16 +331,10 @@ impl Board {
         // Remove piece from old square
         new_game_state.square_set(ply.origin, None);
 
-        println!(
-            "{:?}",
-            self.is_square_attacked(ply.destination, Player::White)
-        );
         // Change turn and return new game state
         new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
     }
-
-    // -----------------
 
     fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
@@ -373,22 +417,6 @@ impl Board {
         }
 
         results
-    }
-
-    fn get_all_moves(&self) -> Vec<Ply> {
-        let mut moves: Vec<Ply> = vec![];
-
-        for row in 0..8 {
-            for col in 0..8 {
-                if let Some(piece) = self.square_get(Coord { row, col }) {
-                    if self.turn == piece.player {
-                        moves.extend(self.get_pseudo_legal_moves(Coord { row, col }).iter())
-                    }
-                }
-            }
-        }
-
-        todo!()
     }
 
     fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
@@ -509,6 +537,6 @@ impl Board {
             }
         }
 
-        self.get_pseudo_legal_moves(ply.origin).contains(ply)
+        self.get_legal_moves(ply.origin).contains(ply)
     }
 }
