@@ -3,6 +3,7 @@
 mod board;
 mod coord;
 mod game;
+mod perft;
 mod piece;
 mod player;
 mod ply;
