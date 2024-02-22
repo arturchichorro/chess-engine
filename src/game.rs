@@ -3,7 +3,7 @@ use std::io;
 
 #[derive(Debug, Clone)]
 pub struct Game {
-    states: Vec<Board>,
+    pub states: Vec<Board>,
 }
 
 impl Game {

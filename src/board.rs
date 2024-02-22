@@ -179,7 +179,7 @@ impl Board {
         None
     }
     // Gives all posible moves in a position
-    fn get_all_moves(&self) -> Vec<Ply> {
+    pub fn get_all_moves(&self) -> Vec<Ply> {
         let mut moves: Vec<Ply> = vec![];
 
         for row in 0..8 {
