@@ -1,5 +1,12 @@
+use crate::coord::Coord;
 use crate::player::Player;
 use std::fmt::{self, Write};
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct PieceLoc {
+    pub kind: Kind,
+    pub loc: Coord,
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Piece {

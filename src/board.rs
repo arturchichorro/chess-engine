@@ -1,6 +1,6 @@
 use crate::{
     coord::Coord,
-    piece::{Kind, Piece},
+    piece::{Kind, Piece, PieceLoc},
     player::Player,
     ply::Ply,
     status::Status,
@@ -11,6 +11,10 @@ pub struct Board {
     pub turn: Player,
 
     board: [[Option<Piece>; 8]; 8],
+    white_pieces: [Option<PieceLoc>; 16],
+    black_pieces: [Option<PieceLoc>; 16],
+    white_king_loc: Coord,
+    black_king_loc: Coord,
 
     white_can_oo: bool,
     white_can_ooo: bool,
@@ -29,6 +33,21 @@ impl Board {
             })
         } else {
             None
+        }
+    }
+
+    fn add_piece(&mut self, p: PieceLoc, t: Player) {
+        match t {
+            Player::Black => {
+                if let Some(slot) = self.black_pieces.iter_mut().find(|p| p.is_none()) {
+                    *slot = Some(p);
+                }
+            }
+            Player::White => {
+                if let Some(slot) = self.white_pieces.iter_mut().find(|p| p.is_none()) {
+                    *slot = Some(p);
+                }
+            }
         }
     }
 
@@ -60,6 +79,23 @@ impl Board {
             .map(|(i, p)| p.map(|x| (i, x)))
             .flatten()
             .for_each(|(i, p)| {
+                if p.kind == fen::PieceKind::King {
+                    match p.color {
+                        fen::Color::White => {
+                            board.white_king_loc = Coord {
+                                row: (i / 8) as i32,
+                                col: (i % 8) as i32,
+                            }
+                        }
+                        fen::Color::Black => {
+                            board.black_king_loc = Coord {
+                                row: (i / 8) as i32,
+                                col: (i % 8) as i32,
+                            }
+                        }
+                    }
+                }
+
                 board.square_set(
                     Coord {
                         row: (i / 8) as i32,
@@ -80,6 +116,43 @@ impl Board {
                         },
                     }),
                 );
+
+                match p.color {
+                    fen::Color::White => board.add_piece(
+                        PieceLoc {
+                            kind: match p.kind {
+                                fen::PieceKind::Pawn => Kind::Pawn,
+                                fen::PieceKind::Knight => Kind::Knight,
+                                fen::PieceKind::Bishop => Kind::Bishop,
+                                fen::PieceKind::Rook => Kind::Rook,
+                                fen::PieceKind::Queen => Kind::Queen,
+                                fen::PieceKind::King => Kind::King,
+                            },
+                            loc: Coord {
+                                row: (i / 8) as i32,
+                                col: (i % 8) as i32,
+                            },
+                        },
+                        Player::White,
+                    ),
+                    fen::Color::Black => board.add_piece(
+                        PieceLoc {
+                            kind: match p.kind {
+                                fen::PieceKind::Pawn => Kind::Pawn,
+                                fen::PieceKind::Knight => Kind::Knight,
+                                fen::PieceKind::Bishop => Kind::Bishop,
+                                fen::PieceKind::Rook => Kind::Rook,
+                                fen::PieceKind::Queen => Kind::Queen,
+                                fen::PieceKind::King => Kind::King,
+                            },
+                            loc: Coord {
+                                row: (i / 8) as i32,
+                                col: (i % 8) as i32,
+                            },
+                        },
+                        Player::Black,
+                    ),
+                }
             });
 
         board
@@ -116,6 +189,25 @@ impl Board {
     }
     fn kind_at_square(&self, location: Coord) -> Option<Kind> {
         self.square_get(location).map(|piece| piece.kind)
+    }
+    fn find_king(&self, player: Player) -> Option<Coord> {
+        for row in 0..8 {
+            for col in 0..8 {
+                if self.board[row][col]
+                    == Some(Piece {
+                        kind: Kind::King,
+                        player,
+                    })
+                {
+                    return Some(Coord {
+                        row: row as i32,
+                        col: col as i32,
+                    });
+                }
+            }
+        }
+
+        None
     }
 
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
@@ -159,25 +251,6 @@ impl Board {
         results
     }
 
-    fn find_king(&self, player: Player) -> Option<Coord> {
-        for row in 0..8 {
-            for col in 0..8 {
-                if self.board[row][col]
-                    == Some(Piece {
-                        kind: Kind::King,
-                        player,
-                    })
-                {
-                    return Some(Coord {
-                        row: row as i32,
-                        col: col as i32,
-                    });
-                }
-            }
-        }
-
-        None
-    }
     // Gives all posible moves in a position
     pub fn get_all_moves(&self) -> Vec<Ply> {
         let mut moves: Vec<Ply> = vec![];
@@ -230,11 +303,207 @@ impl Board {
             .collect()
     }
 
+    fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
+        let player = self.player_at_square(origin).unwrap();
+
+        let dir = player.advancing_direction();
+
+        let mut results: Vec<Ply> = vec![];
+
+        if !self.is_square_occupied(origin + dir) {
+            if (origin + dir).row == 0 || (origin + dir).row == 7 {
+                for promo in Kind::PROMOTIONS {
+                    results.push(Ply {
+                        origin,
+                        destination: origin + dir,
+                        promotion: Some(promo),
+                    })
+                }
+            } else {
+                results.push(Ply {
+                    origin,
+                    destination: origin + dir,
+                    promotion: None,
+                })
+            }
+        } else {
+            return results;
+        }
+
+        if origin.row == 1 && player == Player::White || origin.row == 6 && player == Player::Black
+        {
+            if !self.is_square_occupied(origin + 2 * dir) {
+                results.push(Ply {
+                    origin,
+                    destination: origin + 2 * dir,
+                    promotion: None,
+                })
+            }
+        }
+
+        results
+    }
+
+    fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
+        let player = self.player_at_square(origin).unwrap();
+
+        let mut results: Vec<Ply> = [Coord::L, Coord::R]
+            .iter()
+            .map(|&c| origin + c + player.advancing_direction())
+            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
+            .map(|pos| {
+                if pos.row == 7 || pos.row == 0 {
+                    Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
+                        origin,
+                        destination: pos,
+                        promotion: Some(promo),
+                    })) as Box<dyn Iterator<Item = Ply>>
+                } else {
+                    Box::new(std::iter::once(Ply {
+                        origin,
+                        destination: pos,
+                        promotion: None,
+                    })) as Box<dyn Iterator<Item = Ply>>
+                }
+            })
+            .flatten()
+            .collect();
+
+        // En passant
+        if let Some(en_passant_square) = self.en_passant_square {
+            if (origin + player.advancing_direction()).row == en_passant_square.row {
+                if (origin.col + 1 == en_passant_square.col)
+                    || (origin.col - 1 == en_passant_square.col)
+                {
+                    results.push(Ply {
+                        origin,
+                        destination: en_passant_square,
+                        promotion: None,
+                    })
+                }
+            }
+        }
+
+        results
+    }
+
+    fn get_castling_moves(&self) -> Vec<Ply> {
+        let player = self.turn;
+        let mut results: Vec<Ply> = vec![];
+
+        // Como reduzir estes dois bocados de código quase idênticos?
+        match player {
+            Player::White => {
+                if self.white_can_oo
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player.opponent())
+                    && !self.is_square_occupied(Coord { row: 0, col: 5 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 6 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 0, col: 4 },
+                        destination: Coord { row: 0, col: 6 },
+                        promotion: None,
+                    })
+                }
+                if self.white_can_ooo
+                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player.opponent())
+                    && !self.is_square_occupied(Coord { row: 0, col: 1 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 2 })
+                    && !self.is_square_occupied(Coord { row: 0, col: 3 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 0, col: 4 },
+                        destination: Coord { row: 0, col: 2 },
+                        promotion: None,
+                    })
+                }
+            }
+            Player::Black => {
+                if self.black_can_oo
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player.opponent())
+                    && !self.is_square_occupied(Coord { row: 7, col: 5 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 6 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 7, col: 4 },
+                        destination: Coord { row: 7, col: 6 },
+                        promotion: None,
+                    })
+                }
+                if self.black_can_ooo
+                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player.opponent())
+                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player.opponent())
+                    && !self.is_square_occupied(Coord { row: 7, col: 1 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 2 })
+                    && !self.is_square_occupied(Coord { row: 7, col: 3 })
+                {
+                    results.push(Ply {
+                        origin: Coord { row: 7, col: 4 },
+                        destination: Coord { row: 7, col: 2 },
+                        promotion: None,
+                    })
+                }
+            }
+        }
+
+        results
+    }
+
+    fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
+        Coord::LIST_CARDINAL
+            .iter()
+            .map(|c| (c, Kind::Rook))
+            .chain(Coord::LIST_DIAGONAL.iter().map(|c| (c, Kind::Bishop)))
+            .any(|(&dir, piece)| {
+                (1..)
+                    .map(move |i| origin + dir * i)
+                    .take_while(|&c| c.is_valid())
+                    .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
+                    .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
+                    .any(|c| {
+                        self.player_at_square(c) == Some(by_player)
+                            && (self.kind_at_square(c) == Some(piece)
+                                || self.kind_at_square(c) == Some(Kind::Queen))
+                    })
+            })
+            || [Coord::L, Coord::R]
+                .iter()
+                .map(|&c| origin + c - by_player.advancing_direction())
+                .filter(|&c| c.is_valid())
+                .any(|pos| {
+                    self.square_get(pos)
+                        == &Some(Piece {
+                            kind: Kind::Pawn,
+                            player: by_player,
+                        })
+                })
+            || Coord::LIST_KNIGHT
+                .iter()
+                .map(|&c| origin + c)
+                .filter(|&c| c.is_valid())
+                .any(|pos| {
+                    self.square_get(pos)
+                        == &Some(Piece {
+                            kind: Kind::Knight,
+                            player: by_player,
+                        })
+                })
+    }
+
     pub fn make_move(&self, ply: Ply) -> Board {
         let mut new_game_state = self.clone();
 
         let piece = self.square_get(ply.origin).unwrap();
         let dir = piece.player.advancing_direction();
+
+        // Update piece PieceLoc
 
         // Detect if move was capture or pawn push and update half_move clock
         if piece.kind == Kind::Pawn || self.is_square_occupied(ply.destination) {
@@ -345,200 +614,6 @@ impl Board {
         // Change turn and return new game state
         new_game_state.turn = new_game_state.turn.opponent();
         new_game_state
-    }
-
-    fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
-        let player = self.player_at_square(origin).unwrap();
-
-        let dir = player.advancing_direction();
-
-        let mut results: Vec<Ply> = vec![];
-
-        if !self.is_square_occupied(origin + dir) {
-            if (origin + dir).row == 0 || (origin + dir).row == 7 {
-                for promo in Kind::PROMOTIONS {
-                    results.push(Ply {
-                        origin,
-                        destination: origin + dir,
-                        promotion: Some(promo),
-                    })
-                }
-            } else {
-                results.push(Ply {
-                    origin,
-                    destination: origin + dir,
-                    promotion: None,
-                })
-            }
-        } else {
-            return results;
-        }
-
-        if origin.row == 1 && player == Player::White || origin.row == 6 && player == Player::Black
-        {
-            if !self.is_square_occupied(origin + 2 * dir) {
-                results.push(Ply {
-                    origin,
-                    destination: origin + 2 * dir,
-                    promotion: None,
-                })
-            }
-        }
-
-        results
-    }
-
-    fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
-        let player = self.player_at_square(origin).unwrap();
-
-        let mut results: Vec<Ply> = [Coord::L, Coord::R]
-            .iter()
-            .map(|&c| origin + c + player.advancing_direction())
-            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
-            .map(|pos| {
-                if pos.row == 7 || pos.row == 0 {
-                    Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
-                        origin,
-                        destination: pos,
-                        promotion: Some(promo),
-                    })) as Box<dyn Iterator<Item = Ply>>
-                } else {
-                    Box::new(std::iter::once(Ply {
-                        origin,
-                        destination: pos,
-                        promotion: None,
-                    })) as Box<dyn Iterator<Item = Ply>>
-                }
-            })
-            .flatten()
-            .collect();
-
-        // En passant
-        if let Some(en_passant_square) = self.en_passant_square {
-            if (origin + player.advancing_direction()).row == en_passant_square.row {
-                if (origin.col + 1 == en_passant_square.col)
-                    || (origin.col - 1 == en_passant_square.col)
-                {
-                    results.push(Ply {
-                        origin,
-                        destination: en_passant_square,
-                        promotion: None,
-                    })
-                }
-            }
-        }
-
-        results
-    }
-
-    fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
-        Coord::LIST_CARDINAL
-            .iter()
-            .map(|c| (c, Kind::Rook))
-            .chain(Coord::LIST_DIAGONAL.iter().map(|c| (c, Kind::Bishop)))
-            .any(|(&dir, piece)| {
-                (1..)
-                    .map(move |i| origin + dir * i)
-                    .take_while(|&c| c.is_valid())
-                    .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
-                    .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
-                    .any(|c| {
-                        self.player_at_square(c) == Some(by_player)
-                            && (self.kind_at_square(c) == Some(piece)
-                                || self.kind_at_square(c) == Some(Kind::Queen))
-                    })
-            })
-            || [Coord::L, Coord::R]
-                .iter()
-                .map(|&c| origin + c - by_player.advancing_direction())
-                .filter(|&c| c.is_valid())
-                .any(|pos| {
-                    self.square_get(pos)
-                        == &Some(Piece {
-                            kind: Kind::Pawn,
-                            player: by_player,
-                        })
-                })
-            || Coord::LIST_KNIGHT
-                .iter()
-                .map(|&c| origin + c)
-                .filter(|&c| c.is_valid())
-                .any(|pos| {
-                    self.square_get(pos)
-                        == &Some(Piece {
-                            kind: Kind::Knight,
-                            player: by_player,
-                        })
-                })
-    }
-
-    fn get_castling_moves(&self) -> Vec<Ply> {
-        let player = self.turn;
-        let mut results: Vec<Ply> = vec![];
-
-        // Como reduzir estes dois bocados de código quase idênticos?
-        match player {
-            Player::White => {
-                if self.white_can_oo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 0, col: 5 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 6 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 0, col: 4 },
-                        destination: Coord { row: 0, col: 6 },
-                        promotion: None,
-                    })
-                }
-                if self.white_can_ooo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 0, col: 1 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 2 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 3 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 0, col: 4 },
-                        destination: Coord { row: 0, col: 2 },
-                        promotion: None,
-                    })
-                }
-            }
-            Player::Black => {
-                if self.black_can_oo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 7, col: 5 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 6 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 7, col: 4 },
-                        destination: Coord { row: 7, col: 6 },
-                        promotion: None,
-                    })
-                }
-                if self.black_can_ooo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 7, col: 1 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 2 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 3 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 7, col: 4 },
-                        destination: Coord { row: 7, col: 2 },
-                        promotion: None,
-                    })
-                }
-            }
-        }
-
-        results
     }
 
     pub fn arbiter(&self, ply: &Ply) -> bool {
