@@ -1,4 +1,5 @@
 use crate::{board::Board, game::Game, ply::Ply};
+use std::time::Instant;
 
 // Performance tests
 pub fn perft(board: Board, depth: i32) -> u64 {
@@ -60,8 +61,10 @@ pub fn perft_suite() -> () {
     for (fen, checks) in data {
         let game = Game::new_from_fen(fen);
         for (depth, value) in checks {
+            let start = Instant::now();
             let result = perft(*game.states.last().unwrap(), depth);
-            println!("Position {fen}, depth {depth}, result {result}, expected {value}");
+            let duration = Instant::now().duration_since(start);
+            println!("Position {fen}, depth {depth}, result {result}, expected {value}, took {duration:?}, speed {:.2}", result as f64 / duration.as_secs_f64());
             // assert_eq!(result, value);
         }
     }
