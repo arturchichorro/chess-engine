@@ -79,79 +79,49 @@ impl Board {
             .map(|(i, p)| p.map(|x| (i, x)))
             .flatten()
             .for_each(|(i, p)| {
+                let pos = Coord {
+                    row: (i / 8) as i32,
+                    col: (i % 8) as i32,
+                };
+                let color = match p.color {
+                    fen::Color::White => Player::White,
+                    fen::Color::Black => Player::Black,
+                };
+                let kind = match p.kind {
+                    fen::PieceKind::Pawn => Kind::Pawn,
+                    fen::PieceKind::Knight => Kind::Knight,
+                    fen::PieceKind::Bishop => Kind::Bishop,
+                    fen::PieceKind::Rook => Kind::Rook,
+                    fen::PieceKind::Queen => Kind::Queen,
+                    fen::PieceKind::King => Kind::King,
+                };
+
                 if p.kind == fen::PieceKind::King {
-                    match p.color {
-                        fen::Color::White => {
-                            board.white_king_loc = Coord {
-                                row: (i / 8) as i32,
-                                col: (i % 8) as i32,
-                            }
+                    match color {
+                        Player::White => {
+                            board.white_king_loc = pos;
                         }
-                        fen::Color::Black => {
-                            board.black_king_loc = Coord {
-                                row: (i / 8) as i32,
-                                col: (i % 8) as i32,
-                            }
+                        Player::Black => {
+                            board.black_king_loc = pos;
                         }
                     }
                 }
 
                 board.square_set(
-                    Coord {
-                        row: (i / 8) as i32,
-                        col: (i % 8) as i32,
-                    },
+                    pos,
                     Some(Piece {
-                        player: match p.color {
-                            fen::Color::White => Player::White,
-                            fen::Color::Black => Player::Black,
-                        },
-                        kind: match p.kind {
-                            fen::PieceKind::Pawn => Kind::Pawn,
-                            fen::PieceKind::Knight => Kind::Knight,
-                            fen::PieceKind::Bishop => Kind::Bishop,
-                            fen::PieceKind::Rook => Kind::Rook,
-                            fen::PieceKind::Queen => Kind::Queen,
-                            fen::PieceKind::King => Kind::King,
-                        },
+                        player: color,
+                        kind,
                     }),
                 );
 
                 match p.color {
-                    fen::Color::White => board.add_piece(
-                        PieceLoc {
-                            kind: match p.kind {
-                                fen::PieceKind::Pawn => Kind::Pawn,
-                                fen::PieceKind::Knight => Kind::Knight,
-                                fen::PieceKind::Bishop => Kind::Bishop,
-                                fen::PieceKind::Rook => Kind::Rook,
-                                fen::PieceKind::Queen => Kind::Queen,
-                                fen::PieceKind::King => Kind::King,
-                            },
-                            loc: Coord {
-                                row: (i / 8) as i32,
-                                col: (i % 8) as i32,
-                            },
-                        },
-                        Player::White,
-                    ),
-                    fen::Color::Black => board.add_piece(
-                        PieceLoc {
-                            kind: match p.kind {
-                                fen::PieceKind::Pawn => Kind::Pawn,
-                                fen::PieceKind::Knight => Kind::Knight,
-                                fen::PieceKind::Bishop => Kind::Bishop,
-                                fen::PieceKind::Rook => Kind::Rook,
-                                fen::PieceKind::Queen => Kind::Queen,
-                                fen::PieceKind::King => Kind::King,
-                            },
-                            loc: Coord {
-                                row: (i / 8) as i32,
-                                col: (i % 8) as i32,
-                            },
-                        },
-                        Player::Black,
-                    ),
+                    fen::Color::White => {
+                        board.add_piece(PieceLoc { kind, loc: pos }, Player::White)
+                    }
+                    fen::Color::Black => {
+                        board.add_piece(PieceLoc { kind, loc: pos }, Player::Black)
+                    }
                 }
             });
 
