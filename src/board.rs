@@ -374,7 +374,8 @@ impl Board {
             return results;
         }
 
-        if origin.row % 5 == 1 {
+        if origin.row == 1 && player == Player::White || origin.row == 6 && player == Player::Black
+        {
             if !self.is_square_occupied(origin + 2 * dir) {
                 results.push(Ply {
                     origin,
