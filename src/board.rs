@@ -355,7 +355,7 @@ impl Board {
         let mut results: Vec<Ply> = vec![];
 
         if !self.is_square_occupied(origin + dir) {
-            if origin.row == 0 || origin.row == 7 {
+            if (origin + dir).row == 0 || (origin + dir).row == 7 {
                 for promo in Kind::PROMOTIONS {
                     results.push(Ply {
                         origin,
@@ -561,7 +561,7 @@ impl Board {
             return Status::Draw;
         }
 
-        if !dbg!(self.get_all_moves()).is_empty() {
+        if !self.get_all_moves().is_empty() {
             return Status::Ongoing;
         }
 
