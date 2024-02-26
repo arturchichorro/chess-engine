@@ -29,7 +29,7 @@ pub fn search(board: Board, depth: i32) -> i32 {
         }
         return 0;
     }
-    let x = 3;
+
     let mut best_evaluation = -1000000000;
 
     for i in 0..move_vec.len() {
@@ -38,7 +38,7 @@ pub fn search(board: Board, depth: i32) -> i32 {
 
         best_evaluation = best_evaluation.max(evaluation);
     }
-
+    // Need to find a way to return move
     best_evaluation
 }
 
