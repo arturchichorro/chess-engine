@@ -1,8 +1,15 @@
+use crate::coord::Coord;
 use crate::player::Player;
 use std::fmt::{self, Write};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Piece {
+    pub kind: Kind,
+    pub player: Player,
+}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct PieceCopy {
+    pub coord: Coord,
     pub kind: Kind,
     pub player: Player,
 }
@@ -25,6 +32,12 @@ pub enum Kind {
 
 impl Kind {
     pub const PROMOTIONS: [Kind; 4] = [Kind::Queen, Kind::Rook, Kind::Bishop, Kind::Knight];
+
+    pub const PAWN_VALUE: i32 = 100;
+    pub const KNIGHT_VALUE: i32 = 300;
+    pub const BISHOP_VALUE: i32 = 300;
+    pub const ROOK_VALUE: i32 = 500;
+    pub const QUEEN_VALUE: i32 = 900;
 
     fn character(&self, player: Player) -> char {
         match player {

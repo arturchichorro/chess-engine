@@ -1,6 +1,6 @@
 use crate::{
     coord::Coord,
-    piece::{Kind, Piece},
+    piece::{Kind, Piece, PieceCopy},
     player::Player,
     ply::Ply,
     status::Status,
@@ -10,7 +10,11 @@ use crate::{
 pub struct Board {
     pub turn: Player,
 
-    board: [[Option<Piece>; 8]; 8],
+    pub board: [[Option<Piece>; 8]; 8],
+    pub white_pieces: [Option<PieceCopy>; 16],
+    pub black_pieces: [Option<PieceCopy>; 16],
+    pub white_king_loc: Coord,
+    pub black_king_loc: Coord,
 
     white_can_oo: bool,
     white_can_ooo: bool,
@@ -431,7 +435,7 @@ impl Board {
         results
     }
 
-    fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
+    pub fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
         Coord::LIST_CARDINAL
             .iter()
             .map(|c| (c, Kind::Rook))

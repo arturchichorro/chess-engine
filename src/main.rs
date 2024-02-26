@@ -2,6 +2,7 @@
 
 mod board;
 mod coord;
+mod engine;
 mod game;
 mod perft;
 mod piece;
