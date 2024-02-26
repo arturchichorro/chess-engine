@@ -51,6 +51,29 @@ impl Board {
         }
     }
 
+    fn sort_pieces(&mut self, player: Player) {
+        let mut partition_point = 0;
+
+        match player {
+            Player::Black => {
+                for i in 0..self.black_pieces.len() {
+                    if !self.black_pieces[i].is_none() {
+                        self.black_pieces.swap(i, partition_point);
+                        partition_point += 1;
+                    }
+                }
+            }
+            Player::White => {
+                for i in 0..self.white_pieces.len() {
+                    if !self.white_pieces[i].is_none() {
+                        self.white_pieces.swap(i, partition_point);
+                        partition_point += 1;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn new_from_fen(fen: &str) -> Board {
         let mut board: Board = Default::default();
 
@@ -160,24 +183,11 @@ impl Board {
     fn kind_at_square(&self, location: Coord) -> Option<Kind> {
         self.square_get(location).map(|piece| piece.kind)
     }
-    fn find_king(&self, player: Player) -> Option<Coord> {
-        for row in 0..8 {
-            for col in 0..8 {
-                if self.board[row][col]
-                    == Some(Piece {
-                        kind: Kind::King,
-                        player,
-                    })
-                {
-                    return Some(Coord {
-                        row: row as i32,
-                        col: col as i32,
-                    });
-                }
-            }
+    fn find_king(&self, player: Player) -> Coord {
+        match player {
+            Player::Black => return self.black_king_loc,
+            Player::White => return self.white_king_loc,
         }
-
-        None
     }
 
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
@@ -212,11 +222,10 @@ impl Board {
         pseudo_legal_moves.iter().for_each(|m| {
             let pos_after_move = self.make_move(*m);
 
-            if let Some(king_pos) = pos_after_move.find_king(current_turn) {
-                if !pos_after_move.is_square_attacked(king_pos, pos_after_move.turn) {
-                    results.push(*m);
-                };
-            }
+            let king_pos = pos_after_move.find_king(current_turn);
+            if !pos_after_move.is_square_attacked(king_pos, pos_after_move.turn) {
+                results.push(*m);
+            };
         });
         results
     }
@@ -467,16 +476,71 @@ impl Board {
                 })
     }
 
+    fn update_piece_loc_capture(&mut self, coord: Coord) {
+        let piece = self.square_get(coord).unwrap();
+        // Checks if a piece was captured and updates PieceLoc of captured piece
+        match piece.player {
+            Player::Black => {
+                if let Some(_) = self.square_get(coord) {
+                    for i in 0..16 {
+                        if let Some(ploc) = self.white_pieces[i] {
+                            if ploc.loc == coord {
+                                self.white_pieces[i] = None;
+                                self.sort_pieces(Player::White);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Player::White => {
+                if let Some(_) = self.square_get(coord) {
+                    for i in 0..16 {
+                        if let Some(ploc) = self.black_pieces[i] {
+                            if ploc.loc == coord {
+                                self.black_pieces[i] = None;
+                                self.sort_pieces(Player::Black);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn make_move(&self, ply: Ply) -> Board {
         let mut new_game_state = self.clone();
 
-        let piece = self.square_get(ply.origin).unwrap();
+        let piece = new_game_state.square_get(ply.origin).unwrap();
         let dir = piece.player.advancing_direction();
 
-        // Update piece PieceLoc
+        // Update moved piece PieceLoc
+        match piece.player {
+            Player::Black => {
+                for p in new_game_state.black_pieces {
+                    if let Some(mut ploc) = p {
+                        if ploc.loc == ply.origin {
+                            ploc.loc = ply.destination;
+                        }
+                    }
+                }
+            }
+            Player::White => {
+                for p in new_game_state.white_pieces {
+                    if let Some(mut ploc) = p {
+                        if ploc.loc == ply.origin {
+                            ploc.loc = ply.destination;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update captured piece pieceLoc
 
         // Detect if move was capture or pawn push and update half_move clock
-        if piece.kind == Kind::Pawn || self.is_square_occupied(ply.destination) {
+        if piece.kind == Kind::Pawn || new_game_state.is_square_occupied(ply.destination) {
             new_game_state.half_move_clock = 0;
         } else {
             new_game_state.half_move_clock += 1;
@@ -485,10 +549,12 @@ impl Board {
         // Detect if move was en passant and remove the captured pawn
         if piece.kind == Kind::Pawn
             && ply.origin.col != ply.destination.col
-            && self.square_get(ply.destination).is_none()
+            && new_game_state.square_get(ply.destination).is_none()
         {
             new_game_state.square_set(ply.destination - dir, None);
         }
+
+        // Updates PieceLoc for en passant case
 
         // Update en_passant_square
         new_game_state.en_passant_square =
@@ -498,7 +564,13 @@ impl Board {
                 None
             };
 
+        // Update king location
         // Detect if move was castle and move rook to correct position
+        match piece.player {
+            Player::Black => new_game_state.black_king_loc = ply.destination,
+            Player::White => new_game_state.white_king_loc = ply.destination,
+        }
+
         if piece.kind == Kind::King {
             if ply.destination == ply.origin + 2 * Coord::R {
                 new_game_state.square_set(
@@ -598,9 +670,7 @@ impl Board {
     }
 
     pub fn verify_status(&self) -> Status {
-        let Some(king_pos) = self.find_king(self.turn) else {
-            return Status::Invalid;
-        };
+        let king_pos = self.find_king(self.turn);
 
         if self.half_move_clock == 100 {
             return Status::Draw;
