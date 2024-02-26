@@ -38,7 +38,7 @@ pub fn search(board: Board, depth: i32) -> i32 {
 
         best_evaluation = best_evaluation.max(evaluation);
     }
-    // Need to find a way to return move
+
     best_evaluation
 }
 
