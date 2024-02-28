@@ -6,6 +6,8 @@ use std::fmt::{self, Write};
 pub struct Piece {
     pub kind: Kind,
     pub player: Player,
+    pub coord: Coord,
+    pub idx: usize,
 }
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PieceCopy {

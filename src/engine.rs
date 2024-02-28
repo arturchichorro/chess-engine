@@ -1,11 +1,4 @@
-use crate::{
-    board::Board,
-    coord::Coord,
-    piece::{Kind, Piece},
-    player::Player,
-    ply::Ply,
-    status::Status,
-};
+use crate::{board::Board, piece::Kind, player::Player, ply::Ply};
 
 pub fn search(board: Board, depth: i32) -> i32 {
     let move_vec: Vec<Ply> = board.get_all_moves();
@@ -43,8 +36,8 @@ pub fn search(board: Board, depth: i32) -> i32 {
 }
 
 pub fn evaluate(board: Board) -> i32 {
-    let white_eval = count_material(board, Player::White);
-    let black_eval = count_material(board, Player::Black);
+    let white_eval = count_material(&board, Player::White);
+    let black_eval = count_material(&board, Player::Black);
 
     let mult = match board.turn {
         Player::Black => -1,
@@ -54,35 +47,31 @@ pub fn evaluate(board: Board) -> i32 {
     (white_eval - black_eval) * mult
 }
 
-fn count_material(board: Board, player: Player) -> i32 {
+fn count_material(board: &Board, player: Player) -> i32 {
     let mut result: i32 = 0;
 
     match player {
         Player::Black => {
-            for p in board.black_pieces {
-                if let Some(piece) = p {
-                    match piece.kind {
-                        Kind::Pawn => result += Kind::PAWN_VALUE,
-                        Kind::Rook => result += Kind::ROOK_VALUE,
-                        Kind::Knight => result += Kind::KNIGHT_VALUE,
-                        Kind::Bishop => result += Kind::BISHOP_VALUE,
-                        Kind::Queen => result += Kind::QUEEN_VALUE,
-                        Kind::King => {}
-                    }
+            for p in &board.black_pieces {
+                match p.kind {
+                    Kind::Pawn => result += Kind::PAWN_VALUE,
+                    Kind::Rook => result += Kind::ROOK_VALUE,
+                    Kind::Knight => result += Kind::KNIGHT_VALUE,
+                    Kind::Bishop => result += Kind::BISHOP_VALUE,
+                    Kind::Queen => result += Kind::QUEEN_VALUE,
+                    Kind::King => {}
                 }
             }
         }
         Player::White => {
-            for p in board.white_pieces {
-                if let Some(piece) = p {
-                    match piece.kind {
-                        Kind::Pawn => result += Kind::PAWN_VALUE,
-                        Kind::Rook => result += Kind::ROOK_VALUE,
-                        Kind::Knight => result += Kind::KNIGHT_VALUE,
-                        Kind::Bishop => result += Kind::BISHOP_VALUE,
-                        Kind::Queen => result += Kind::QUEEN_VALUE,
-                        Kind::King => {}
-                    }
+            for p in &board.white_pieces {
+                match p.kind {
+                    Kind::Pawn => result += Kind::PAWN_VALUE,
+                    Kind::Rook => result += Kind::ROOK_VALUE,
+                    Kind::Knight => result += Kind::KNIGHT_VALUE,
+                    Kind::Bishop => result += Kind::BISHOP_VALUE,
+                    Kind::Queen => result += Kind::QUEEN_VALUE,
+                    Kind::King => {}
                 }
             }
         }

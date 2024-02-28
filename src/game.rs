@@ -42,7 +42,10 @@ impl Game {
                 break;
             }
 
-            match dbg!(next_pos.verify_status()) {
+            println!("{:?}", next_pos.black_king_loc);
+            println!("{:?}", next_pos.white_king_loc);
+
+            match next_pos.verify_status() {
                 crate::status::Status::Invalid => {
                     next_pos.print_board(next_pos.turn);
                     println!("Invalid position");
