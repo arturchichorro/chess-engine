@@ -36,6 +36,17 @@ impl Board {
         }
     }
 
+    pub fn reverse_notation_conversion(coord: Coord) -> (char, i32) {
+        let row = coord.row + 1;
+        let col = coord.col + ('a' as i32);
+
+        if row >= 1 && row <= 8 && col >= ('a' as i32) && col <= ('h' as i32) {
+            (col as u8 as char, row)
+        } else {
+            ('a', 0)
+        }
+    }
+
     pub fn new_from_fen(fen: &str) -> Board {
         let mut board: Board = Default::default();
 
@@ -102,6 +113,24 @@ impl Board {
                 board.add_piece_to_empty_square(piece);
             });
 
+        // println!(
+        //     "nº of black pieces: {}, black pieces: {:?}",
+        //     board.black_pieces.len(),
+        //     board.black_pieces
+        // );
+        // println!("----------------------");
+        // println!(
+        //     "nº of white pieces: {}, white pieces: {:?}",
+        //     board.white_pieces.len(),
+        //     board.white_pieces
+        // );
+        // println!("----------------------");
+        // println!("black king loc {:?}", board.black_king_loc);
+        // println!("white king loc {:?}", board.white_king_loc);
+        // board.print_board(Player::White);
+
+        // Board::check_everything(&board);
+
         board
     }
 
@@ -126,7 +155,6 @@ impl Board {
     /// Index management is done here
     fn add_piece_to_empty_square(&mut self, mut p: Piece) {
         assert!(self.board[p.coord.row as usize][p.coord.col as usize].is_none());
-        self.board[p.coord.row as usize][p.coord.col as usize] = Some(p);
         match p.player {
             Player::Black => {
                 p.idx = self.black_pieces.len();
@@ -134,9 +162,10 @@ impl Board {
             }
             Player::White => {
                 p.idx = self.white_pieces.len();
-                self.white_pieces.push(p)
+                self.white_pieces.push(p);
             }
         }
+        self.board[p.coord.row as usize][p.coord.col as usize] = Some(p);
     }
 
     /// Removes a piece from an occupied square by providing the coordinate
@@ -144,21 +173,52 @@ impl Board {
     /// Index management is done here
     fn remove_piece_from_occupied_square(&mut self, coord: Coord) {
         if let &Some(p) = self.get_piece_by_coord(coord) {
-            self.board[coord.row as usize][coord.col as usize] = None;
             match p.player {
                 Player::Black => {
                     self.black_pieces.remove(p.idx);
-                    for piece in &mut self.black_pieces[p.idx..] {
+                    for piece in self.black_pieces.iter_mut().skip(p.idx) {
                         piece.idx -= 1;
+                        self.board[piece.coord.row as usize][piece.coord.col as usize]
+                            .iter_mut()
+                            .for_each(|x| x.idx -= 1);
                     }
                 }
                 Player::White => {
                     self.white_pieces.remove(p.idx);
-                    for piece in &mut self.white_pieces[p.idx..] {
+                    for piece in self.white_pieces.iter_mut().skip(p.idx) {
                         piece.idx -= 1;
+                        self.board[piece.coord.row as usize][piece.coord.col as usize]
+                            .iter_mut()
+                            .for_each(|x| x.idx -= 1);
                     }
                 }
             };
+            self.board[coord.row as usize][coord.col as usize] = None;
+        }
+    }
+
+    pub fn check_everything(board: &Board) {
+        for row in 0..8 {
+            for col in 0..8 {
+                if let Some(p) = board.get_piece_by_coord(Coord { row, col }) {
+                    match p.player {
+                        Player::Black => {
+                            // println!(
+                            //     "black[p.idx] = {:?}, *p = {:?}",
+                            //     board.black_pieces[p.idx], *p
+                            // );
+                            assert!(board.black_pieces[p.idx] == *p)
+                        }
+                        Player::White => {
+                            // println!(
+                            //     "white[p.idx] = {:?}, *p = {:?}",
+                            //     board.white_pieces[p.idx], *p
+                            // );
+                            assert!(board.white_pieces[p.idx] == *p)
+                        }
+                    }
+                };
+            }
         }
     }
 
@@ -172,12 +232,18 @@ impl Board {
                 self.black_pieces.remove(p.idx);
                 for piece in &mut self.black_pieces[p.idx..] {
                     piece.idx -= 1;
+                    self.board[piece.coord.row as usize][piece.coord.col as usize]
+                        .iter_mut()
+                        .for_each(|x| x.idx -= 1);
                 }
             }
             Player::White => {
                 self.white_pieces.remove(p.idx);
                 for piece in &mut self.white_pieces[p.idx..] {
                     piece.idx -= 1;
+                    self.board[piece.coord.row as usize][piece.coord.col as usize]
+                        .iter_mut()
+                        .for_each(|x| x.idx -= 1);
                 }
             }
         };
@@ -248,6 +314,21 @@ impl Board {
             Player::White => self.white_king_loc = destination,
         }
     }
+
+    // fn modify_piece_idx_in_board(&mut self, p: Piece, new_idx: usize) {
+    //     if let &Some(mut piece) = self.get_piece_by_coord(p.coord) {
+    //         piece.idx = new_idx;
+    //         self.board[p.coord.row as usize][p.coord.col as usize] = Some(piece);
+    //     }
+
+    //     if let Some(x) = self.board[p.coord.row as usize][p.coord.col as usize].as_mut() {
+    //         x.idx = new_idx;
+    //     }
+
+    //     self.board[p.coord.row as usize][p.coord.col as usize]
+    //         .iter_mut()
+    //         .for_each(|x| x.idx = new_idx);
+    // }
 
     fn get_piece_by_coord(&self, coord: Coord) -> &Option<Piece> {
         &self.board[coord.row as usize][coord.col as usize]
@@ -594,6 +675,17 @@ impl Board {
                 .any(|pos| {
                     if let Some(p) = self.get_piece_by_coord(pos) {
                         p.kind == Kind::Knight && p.player == by_player
+                    } else {
+                        false
+                    }
+                })
+            || Coord::LIST_CARDINAL_DIAGONAL
+                .iter()
+                .map(|&c| origin + c)
+                .filter(|&c| c.is_valid())
+                .any(|pos| {
+                    if let Some(p) = self.get_piece_by_coord(pos) {
+                        p.kind == Kind::King && p.player == by_player
                     } else {
                         false
                     }

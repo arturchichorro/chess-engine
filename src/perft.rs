@@ -10,11 +10,42 @@ pub fn perft(board: &Board, depth: i32) -> u64 {
         return 1;
     }
 
+    Board::check_everything(board);
+
     for i in 0..move_vec.len() {
         let new_board_state = board.make_move(move_vec[i]);
         nodes += perft(&new_board_state, depth - 1);
     }
     nodes
+}
+
+pub fn perft_divider() {
+    let depth = 4;
+    let fen = "6n1/p1q1pP1P/3pkP2/P3P3/4KB2/2P3p1/7P/8 w - - 0 1";
+    let game = Game::new_from_fen(fen);
+    let board = game.states.last().unwrap();
+    let mut result = 0;
+
+    Board::check_everything(board);
+    let move_vec = board.get_all_moves();
+    move_vec.iter().for_each(|ply| {
+        let new_board_state = board.make_move(*ply);
+
+        let accum = perft(&new_board_state, depth - 1);
+
+        result += accum;
+        println!(
+            "{}{} {}{} nodes: {}",
+            Board::reverse_notation_conversion(ply.origin).0,
+            Board::reverse_notation_conversion(ply.origin).1,
+            Board::reverse_notation_conversion(ply.destination).0,
+            Board::reverse_notation_conversion(ply.destination).1,
+            accum
+        );
+        // println!("{:?}", new_board_state.get_all_moves());
+    });
+
+    println!("Total nodes: {}", result);
 }
 
 pub fn perft_one_pos() -> () {
