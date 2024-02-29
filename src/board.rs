@@ -222,58 +222,6 @@ impl Board {
         }
     }
 
-    /// Removes a piece from an occupied square by providing the piece
-    fn remove_piece_from_occupied_square_by_piece(&mut self, p: Piece) {
-        assert!(self.board[p.coord.row as usize][p.coord.col as usize] == Some(p));
-        self.board[p.coord.row as usize][p.coord.col as usize] = None;
-
-        match p.player {
-            Player::Black => {
-                self.black_pieces.remove(p.idx);
-                for piece in &mut self.black_pieces[p.idx..] {
-                    piece.idx -= 1;
-                    self.board[piece.coord.row as usize][piece.coord.col as usize]
-                        .iter_mut()
-                        .for_each(|x| x.idx -= 1);
-                }
-            }
-            Player::White => {
-                self.white_pieces.remove(p.idx);
-                for piece in &mut self.white_pieces[p.idx..] {
-                    piece.idx -= 1;
-                    self.board[piece.coord.row as usize][piece.coord.col as usize]
-                        .iter_mut()
-                        .for_each(|x| x.idx -= 1);
-                }
-            }
-        };
-    }
-
-    /// Moves a piece from a square to another (includes captures)
-    /// Updates king location
-    fn move_piece(&mut self, mut p: Piece, destination: Coord) {
-        assert!(self.board[p.coord.row as usize][p.coord.col as usize] == Some(p));
-
-        self.remove_piece_from_occupied_square(destination);
-
-        self.board[p.coord.row as usize][p.coord.col as usize] = None;
-        p.coord = destination;
-
-        self.board[destination.row as usize][destination.col as usize] = Some(p);
-        match p.player {
-            Player::Black => {
-                self.black_pieces[p.idx] = p;
-            }
-            Player::White => {
-                self.white_pieces[p.idx] = p;
-            }
-        };
-
-        if p.kind == Kind::King {
-            self.move_king(p.player, destination);
-        }
-    }
-
     fn promote_piece(&mut self, mut p: Piece, promo: Kind) {
         match p.player {
             Player::Black => {
@@ -303,32 +251,13 @@ impl Board {
                 }
             };
             if p.kind == Kind::King {
-                self.move_king(p.player, destination);
+                match p.player {
+                    Player::Black => self.black_king_loc = destination,
+                    Player::White => self.white_king_loc = destination,
+                }
             }
         }
     }
-
-    fn move_king(&mut self, player: Player, destination: Coord) {
-        match player {
-            Player::Black => self.black_king_loc = destination,
-            Player::White => self.white_king_loc = destination,
-        }
-    }
-
-    // fn modify_piece_idx_in_board(&mut self, p: Piece, new_idx: usize) {
-    //     if let &Some(mut piece) = self.get_piece_by_coord(p.coord) {
-    //         piece.idx = new_idx;
-    //         self.board[p.coord.row as usize][p.coord.col as usize] = Some(piece);
-    //     }
-
-    //     if let Some(x) = self.board[p.coord.row as usize][p.coord.col as usize].as_mut() {
-    //         x.idx = new_idx;
-    //     }
-
-    //     self.board[p.coord.row as usize][p.coord.col as usize]
-    //         .iter_mut()
-    //         .for_each(|x| x.idx = new_idx);
-    // }
 
     fn get_piece_by_coord(&self, coord: Coord) -> &Option<Piece> {
         &self.board[coord.row as usize][coord.col as usize]
@@ -356,21 +285,23 @@ impl Board {
         self.get_piece_by_coord(location).map(|piece| piece.kind)
     }
 
+    // TODO: returns iter
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             match piece_in_square.kind {
                 Kind::Pawn => {
                     vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
+                    // TODO: returns iter
                 }
-                Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT),
-                Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL),
+                Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT), // TODO: returns iter
+                Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL), // TODO: returns iter
                 Kind::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
                 Kind::Queen => {
                     self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
                 }
                 Kind::King => vec![
-                    self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
-                    self.get_castling_moves(),
+                    self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL), // TODO: returns iter
+                    self.get_castling_moves(), // TODO: returns iter
                 ]
                 .concat(),
             }
@@ -380,6 +311,7 @@ impl Board {
     }
 
     // Returns a vector with all the legal moves possible for the piece at position coord
+    // TODO: returns iter
     fn get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         let pseudo_legal_moves = self.get_pseudo_legal_moves(coord);
         let current_turn = self.turn;
@@ -651,45 +583,33 @@ impl Board {
                     .take_while(|&c| c.is_valid())
                     .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
                     .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
+                    .filter(|&c| self.player_at_square(c) == Some(by_player))
                     .any(|c| {
-                        self.player_at_square(c) == Some(by_player)
-                            && (self.kind_at_square(c) == Some(piece)
-                                || self.kind_at_square(c) == Some(Kind::Queen))
+                        self.kind_at_square(c) == Some(piece)
+                            || self.kind_at_square(c) == Some(Kind::Queen)
                     })
             })
             || [Coord::L, Coord::R]
                 .iter()
                 .map(|&c| origin + c - by_player.advancing_direction())
                 .filter(|&c| c.is_valid())
-                .any(|pos| {
-                    if let Some(p) = self.get_piece_by_coord(pos) {
-                        p.kind == Kind::Pawn && p.player == by_player
-                    } else {
-                        false
-                    }
-                })
-            || Coord::LIST_KNIGHT
-                .iter()
-                .map(|&c| origin + c)
-                .filter(|&c| c.is_valid())
-                .any(|pos| {
-                    if let Some(p) = self.get_piece_by_coord(pos) {
-                        p.kind == Kind::Knight && p.player == by_player
-                    } else {
-                        false
-                    }
-                })
-            || Coord::LIST_CARDINAL_DIAGONAL
-                .iter()
-                .map(|&c| origin + c)
-                .filter(|&c| c.is_valid())
-                .any(|pos| {
-                    if let Some(p) = self.get_piece_by_coord(pos) {
-                        p.kind == Kind::King && p.player == by_player
-                    } else {
-                        false
-                    }
-                })
+                .map(|c| self.get_piece_by_coord(c))
+                .flatten()
+                .any(|p| p.kind == Kind::Pawn && p.player == by_player)
+            || [
+                (Coord::LIST_KNIGHT, Kind::Knight),
+                (Coord::LIST_CARDINAL_DIAGONAL, Kind::King),
+            ]
+            .into_iter()
+            .any(|(coords, piece)| {
+                coords
+                    .iter()
+                    .map(|&c| origin + c)
+                    .filter(|&c| c.is_valid())
+                    .map(|c| self.get_piece_by_coord(c))
+                    .flatten()
+                    .any(|p| p.kind == piece && p.player == by_player)
+            })
     }
 
     fn get_castling_moves(&self) -> Vec<Ply> {
