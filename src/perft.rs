@@ -50,7 +50,7 @@ pub fn perft_divider() {
 
 pub fn perft_one_pos() -> () {
     let fen = "4k3/7p/8/1pp1ppp1/pP1p1P2/8/P1P1P1PP/4K3 w - - 0 1";
-    let checks = vec![(1, 6), (2, 264), (3, 9467)(4, 422333)];
+    let checks = vec![(1, 6), (2, 264), (3, 9467), (4, 422333)];
 
     let game = Game::new_from_fen(fen);
     for (depth, value) in checks {
