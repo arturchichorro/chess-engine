@@ -197,31 +197,6 @@ impl Board {
         }
     }
 
-    pub fn check_everything(board: &Board) {
-        for row in 0..8 {
-            for col in 0..8 {
-                if let Some(p) = board.get_piece_by_coord(Coord { row, col }) {
-                    match p.player {
-                        Player::Black => {
-                            // println!(
-                            //     "black[p.idx] = {:?}, *p = {:?}",
-                            //     board.black_pieces[p.idx], *p
-                            // );
-                            assert!(board.black_pieces[p.idx] == *p)
-                        }
-                        Player::White => {
-                            // println!(
-                            //     "white[p.idx] = {:?}, *p = {:?}",
-                            //     board.white_pieces[p.idx], *p
-                            // );
-                            assert!(board.white_pieces[p.idx] == *p)
-                        }
-                    }
-                };
-            }
-        }
-    }
-
     fn promote_piece(&mut self, mut p: Piece, promo: Kind) {
         match p.player {
             Player::Black => {
@@ -262,6 +237,7 @@ impl Board {
     fn get_piece_by_coord(&self, coord: Coord) -> &Option<Piece> {
         &self.board[coord.row as usize][coord.col as usize]
     }
+
     fn get_piece_by_index(&self, idx: usize, player: Player) -> Piece {
         match player {
             Player::Black => {
@@ -283,6 +259,33 @@ impl Board {
     }
     fn kind_at_square(&self, location: Coord) -> Option<Kind> {
         self.get_piece_by_coord(location).map(|piece| piece.kind)
+    }
+
+    /// Function for debugging.
+    /// Checks if both the board and the piece vectors in the data structure are properly synced up.
+    pub fn check_everything(board: &Board) {
+        for row in 0..8 {
+            for col in 0..8 {
+                if let Some(p) = board.get_piece_by_coord(Coord { row, col }) {
+                    match p.player {
+                        Player::Black => {
+                            // println!(
+                            //     "black[p.idx] = {:?}, *p = {:?}",
+                            //     board.black_pieces[p.idx], *p
+                            // );
+                            assert!(board.black_pieces[p.idx] == *p)
+                        }
+                        Player::White => {
+                            // println!(
+                            //     "white[p.idx] = {:?}, *p = {:?}",
+                            //     board.white_pieces[p.idx], *p
+                            // );
+                            assert!(board.white_pieces[p.idx] == *p)
+                        }
+                    }
+                };
+            }
+        }
     }
 
     // TODO: returns iter
