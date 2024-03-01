@@ -10,8 +10,6 @@ pub fn perft(board: &Board, depth: i32) -> u64 {
         return 1;
     }
 
-    Board::check_everything(board);
-
     for i in 0..move_vec.len() {
         let new_board_state = board.make_move(move_vec[i]);
         nodes += perft(&new_board_state, depth - 1);
