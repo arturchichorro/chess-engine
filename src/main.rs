@@ -25,18 +25,19 @@ fn main() {
     // let mut game = game::Game::new();
     // game.play();
     // let game_six = game::Game::new_from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",);
-    // println!("{}", perft::perft(*game_six.states.last().unwrap(), 2));
+    // // println!("{}", perft::perft(*game_six.states.last().unwrap(), 2));
 
-    let game = game::Game::new_from_fen("8/2p5/3p4/KP5r/1R3p1k/4P3/6P1/8 b - - 0 1");
-    let board = game.states.last().unwrap();
-    // println!("{:?}", board.new_get_legal_moves(Coord { row: 1, col: 3 }));
+    // let game =
+    //     game::Game::new_from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B3n1/P7/1PP1N1PP/RNBQ1RK1 b - - 2 9");
+    // let board = game.states.last().unwrap();
+    // // println!("{:?}", board.new_get_legal_moves(Coord { row: 1, col: 3 }));
 
-    println!(
-        "{:?}",
-        board.is_piece_pinned(board.get_piece_by_coord(Coord { row: 3, col: 5 }).unwrap()),
-    );
+    // println!(
+    //     "{}",
+    //     board.is_square_attacked(Coord { row: 1, col: 5 }, player::Player::Black),
+    // );
 
-    // perft::perft_suite();
+    perft::perft_suite();
     // perft::perft_one_pos();
-    perft::perft_divider();
+    // perft::perft_divider();
 }

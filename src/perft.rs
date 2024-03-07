@@ -18,8 +18,8 @@ pub fn perft(board: &Board, depth: i32) -> u64 {
 }
 
 pub fn perft_divider() {
-    let depth = 2;
-    let fen = "8/2p5/3p4/KP5r/1R3p1k/4P3/6P1/8 b - - 0 1";
+    let depth = 1;
+    let fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B3n1/P7/1PP1N1PP/RNBQ1RK1 b - - 2 9";
     let game = Game::new_from_fen(fen);
     let board = game.states.last().unwrap();
     let mut result = 0;
@@ -33,7 +33,7 @@ pub fn perft_divider() {
 
         result += accum;
         println!(
-            "{}{} {}{} nodes: {}",
+            "{}{} {}{}: {}",
             Board::reverse_notation_conversion(ply.origin).0,
             Board::reverse_notation_conversion(ply.origin).1,
             Board::reverse_notation_conversion(ply.destination).0,
