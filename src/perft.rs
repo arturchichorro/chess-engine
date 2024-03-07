@@ -18,8 +18,8 @@ pub fn perft(board: &Board, depth: i32) -> u64 {
 }
 
 pub fn perft_divider() {
-    let depth = 4;
-    let fen = "6n1/p1q1pP1P/3pkP2/P3P3/4KB2/2P3p1/7P/8 w - - 0 1";
+    let depth = 2;
+    let fen = "8/2p5/3p4/KP5r/1R3p1k/4P3/6P1/8 b - - 0 1";
     let game = Game::new_from_fen(fen);
     let board = game.states.last().unwrap();
     let mut result = 0;
@@ -47,7 +47,7 @@ pub fn perft_divider() {
 }
 
 pub fn perft_one_pos() -> () {
-    let fen = "4k3/7p/8/1pp1ppp1/pP1p1P2/8/P1P1P1PP/4K3 w - - 0 1";
+    let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     let checks = vec![(1, 6), (2, 264), (3, 9467), (4, 422333)];
 
     let game = Game::new_from_fen(fen);

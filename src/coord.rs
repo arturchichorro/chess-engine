@@ -54,6 +54,42 @@ impl Coord {
     pub fn is_valid(&self) -> bool {
         self.col <= 7 && self.row <= 7 && self.col >= 0 && self.row >= 0
     }
+
+    pub fn find_dir_between_coords(pos_one: Coord, pos_two: Coord) -> Coord {
+        let row_delta = pos_one.row - pos_two.row;
+        let col_delta = pos_one.col - pos_two.col;
+        match (row_delta, col_delta) {
+            (0, _) => {
+                if col_delta > 0 {
+                    Coord::R
+                } else {
+                    Coord::L
+                }
+            }
+            (_, 0) => {
+                if row_delta > 0 {
+                    Coord::U
+                } else {
+                    Coord::D
+                }
+            }
+            (_, _) => {
+                if row_delta > 0 {
+                    if col_delta > 0 {
+                        Coord::UR
+                    } else {
+                        Coord::UL
+                    }
+                } else {
+                    if col_delta > 0 {
+                        Coord::DR
+                    } else {
+                        Coord::DL
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl std::ops::Add for Coord {

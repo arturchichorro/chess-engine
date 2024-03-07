@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use coord::Coord;
 mod board;
 mod coord;
 mod engine;
@@ -26,7 +27,16 @@ fn main() {
     // let game_six = game::Game::new_from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",);
     // println!("{}", perft::perft(*game_six.states.last().unwrap(), 2));
 
-    perft::perft_suite();
+    let game = game::Game::new_from_fen("8/2p5/3p4/KP5r/1R3p1k/4P3/6P1/8 b - - 0 1");
+    let board = game.states.last().unwrap();
+    // println!("{:?}", board.new_get_legal_moves(Coord { row: 1, col: 3 }));
+
+    println!(
+        "{:?}",
+        board.is_piece_pinned(board.get_piece_by_coord(Coord { row: 3, col: 5 }).unwrap()),
+    );
+
+    // perft::perft_suite();
     // perft::perft_one_pos();
-    // perft::perft_divider();
+    perft::perft_divider();
 }

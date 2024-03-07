@@ -1,6 +1,8 @@
+use std::num::NonZeroU64;
+
 use crate::{
     coord::Coord,
-    piece::{Kind, Piece},
+    piece::{self, Kind, Piece},
     player::Player,
     ply::Ply,
     status::Status,
@@ -234,7 +236,7 @@ impl Board {
         }
     }
 
-    fn get_piece_by_coord(&self, coord: Coord) -> &Option<Piece> {
+    pub fn get_piece_by_coord(&self, coord: Coord) -> &Option<Piece> {
         &self.board[coord.row as usize][coord.col as usize]
     }
 
@@ -296,14 +298,14 @@ impl Board {
                     vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)].concat()
                     // TODO: returns iter
                 }
-                Kind::Knight => self.get_king_knight_moves(coord, &Coord::LIST_KNIGHT), // TODO: returns iter
+                Kind::Knight => self.get_knight_moves(coord, &Coord::LIST_KNIGHT), // TODO: returns iter
                 Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL), // TODO: returns iter
                 Kind::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
                 Kind::Queen => {
                     self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
                 }
                 Kind::King => vec![
-                    self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL), // TODO: returns iter
+                    self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL), // TODO: returns iter
                     self.get_castling_moves(), // TODO: returns iter
                 ]
                 .concat(),
@@ -331,60 +333,163 @@ impl Board {
         results
     }
 
-    fn new_get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+    pub fn new_get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
-            match self.turn {
-                Player::Black => {
-                    if self.is_square_attacked(self.black_king_loc, Player::White) {
-                        match piece_in_square.kind {
-                            Kind::King => {
-                                self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
-                            }
-                            _ => {
-                                // descobrir que peças estão a atacar o rei (será que faz sentido incluir isso no is_square_attacked?)
-                                // caso "piece_in_square.kind = King" return get_king_moves
-                                // -> caso é só uma peça
-                                // @@ Verificar se estamos pinned
-                                // *** Se sim: return [] (não é possível estarmos pinned pela peça que também está a dar cheque)
-                                // *** Se não:
-                                // -> caso checking_piece é um cavalo ou um peão:
-                                // return jogadas em que ply.destination = checking_piece.coord + safe jogadas do rei
-                                // (dividir em casos do "piece_in_square.kind")
-                                // -> caso checking_piece é um bispo/rainha/torre
-                                // return jogadas em que ply.destination = checking_piece.coord + jogadas cujo ply.destination
-                                // é um quadrado entre checking_piece e o rei
-                                // -> caso em que são duas peças
-                                // nenhuma peça para além do rei pode mexer
-                                todo!()
-                            }
+            let king_loc = match self.turn {
+                Player::Black => self.black_king_loc,
+                Player::White => self.white_king_loc,
+            };
+
+            let checking_pieces = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
+
+            if checking_pieces.len() == 1 {
+                match piece_in_square.kind {
+                    Kind::King => self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                    _ => {
+                        if let Some(_) = self.is_piece_pinned(*piece_in_square) {
+                            return vec![];
                         }
-                    } else {
-                        match piece_in_square.kind {
-                            Kind::King => vec![
-                                self.get_king_knight_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL), // TODO: returns iter
-                                self.get_castling_moves(), // TODO: returns iter
-                            ]
-                            .concat(),
-                            _ => {
-                                // @@ Verificar se estamos pinned
-                                // *** Se sim:
-                                // -> caso "piece_in_square.kind = Queen | Bishop | Rook" basta chamar o "get_queen_rook_bishop_moves"
-                                // apenas com as direções em que o movimento é permitido (filtrar Rook/Bishop/Queen pelas direções
-                                // permitidas pelo pin). Obtemos essas direções a partir do vetor rei_loc em direção a coord
-                                // -> caso "piece_in_square.kind = Knight" return []
-                                // -> caso "piece_in_square.kind = Pawn", não permitir normal pawn moves, permitir capturas apenas
-                                // no caso em que podem comer o bispo que está a dar pin
-                                // *** Se não: return get_(piece_in_square.kind_moves)
-                                todo!()
+                        match checking_pieces[0].kind {
+                            Kind::Pawn | Kind::Knight => self
+                                .get_pseudo_legal_moves(coord)
+                                .into_iter()
+                                .filter(|ply| ply.destination == checking_pieces[0].coord)
+                                .collect(),
+                            Kind::Rook | Kind::Bishop | Kind::Queen => {
+                                let dir = Coord::find_dir_between_coords(
+                                    checking_pieces[0].coord,
+                                    king_loc,
+                                );
+
+                                let mut pos = king_loc + dir;
+                                let mut possible_destinations: Vec<Coord> = vec![];
+                                while pos != checking_pieces[0].coord + dir {
+                                    possible_destinations.push(pos);
+                                    pos = pos + dir;
+                                }
+
+                                self.get_pseudo_legal_moves(coord)
+                                    .into_iter()
+                                    .filter(|ply| possible_destinations.contains(&ply.destination))
+                                    .collect()
                             }
+                            Kind::King => panic!("King cannot be the checking piece"),
                         }
                     }
                 }
-                Player::White => todo!(),
+            } else if checking_pieces.len() == 2 {
+                match piece_in_square.kind {
+                    Kind::King => self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                    _ => {
+                        vec![]
+                    }
+                }
+            } else {
+                if let Some(pin_direction) = self.is_piece_pinned(*piece_in_square) {
+                    match piece_in_square.kind {
+                        Kind::Pawn => self
+                            .get_pawn_captures(coord)
+                            .into_iter()
+                            .filter(|ply| {
+                                ply.destination
+                                    == piece_in_square.coord
+                                        // + piece_in_square.player.advancing_direction()
+                                        + pin_direction
+                            })
+                            .collect(),
+                        Kind::Knight => vec![],
+                        Kind::Rook => self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_CARDINAL
+                                .into_iter()
+                                .filter(|&dir| dir == pin_direction || dir == -1 * pin_direction)
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                        ),
+                        Kind::Bishop => self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_DIAGONAL
+                                .into_iter()
+                                .filter(|&dir| dir == pin_direction || dir == -1 * pin_direction)
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                        ),
+                        Kind::Queen => self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_CARDINAL_DIAGONAL
+                                .into_iter()
+                                .filter(|&dir| dir == pin_direction || dir == -1 * pin_direction)
+                                .collect::<Vec<_>>()
+                                .as_slice(),
+                        ),
+                        Kind::King => unreachable!(),
+                    }
+                } else {
+                    self.get_pseudo_legal_moves(coord)
+                }
+
+                // @@ Verificar se estamos pinned
+                // *** Se sim:
+                // -> caso "piece_in_square.kind = Queen | Bishop | Rook" basta chamar o "get_queen_rook_bishop_moves"
+                // apenas com as direções em que o movimento é permitido (filtrar Rook/Bishop/Queen pelas direções
+                // permitidas pelo pin). Obtemos essas direções a partir do vetor rei_loc em direção a coord
+                // -> caso "piece_in_square.kind = Knight" return []
+                // -> caso "piece_in_square.kind = Pawn", não permitir normal pawn moves, permitir capturas apenas
+                // no caso em que podem comer o bispo que está a dar pin
+                // *** Se não: return get_(piece_in_square.kind_moves)
             }
         } else {
             vec![]
         }
+    }
+
+    pub fn is_piece_pinned(&self, p: Piece) -> Option<Coord> {
+        if p.kind == Kind::King {
+            return None;
+        }
+
+        let king_loc = match p.player {
+            Player::Black => self.black_king_loc,
+            Player::White => self.white_king_loc,
+        };
+
+        let dir = Coord::find_dir_between_coords(p.coord, king_loc);
+
+        for i in 1..8 {
+            let pos = king_loc + i * dir;
+            if !pos.is_valid() || (self.is_square_occupied(pos) && pos != p.coord) {
+                return None;
+            };
+            if pos == p.coord {
+                for j in 1..8 {
+                    let pos_after_piece = p.coord + j * dir;
+                    if !pos_after_piece.is_valid() {
+                        return None;
+                    }
+
+                    if let Some(piece) = self.get_piece_by_coord(pos_after_piece) {
+                        let pinning_piece = {
+                            if dir.row == dir.col || dir.row == -1 * dir.col {
+                                Kind::Bishop
+                            } else {
+                                Kind::Rook
+                            }
+                        };
+
+                        if piece.player == p.player
+                            || (piece.kind != pinning_piece && piece.kind != Kind::Queen)
+                        {
+                            return None;
+                        }
+
+                        if piece.kind == pinning_piece || piece.kind == Kind::Queen {
+                            return Some(dir);
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn find_king(&self, player: Player) -> Coord {
@@ -400,12 +505,12 @@ impl Board {
         match self.turn {
             Player::Black => {
                 for p in &self.black_pieces {
-                    moves.extend(self.get_legal_moves(p.coord));
+                    moves.extend(self.new_get_legal_moves(p.coord));
                 }
             }
             Player::White => {
                 for p in &self.white_pieces {
-                    moves.extend(self.get_legal_moves(p.coord));
+                    moves.extend(self.new_get_legal_moves(p.coord));
                 }
             }
         }
@@ -413,7 +518,26 @@ impl Board {
         moves
     }
 
-    fn get_king_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+    fn get_king_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+        let player = self.player_at_square(origin).unwrap();
+
+        directions
+            .iter()
+            .map(|&delta| origin + delta)
+            .filter(|&pos| {
+                pos.is_valid()
+                    && self.player_at_square(pos) != Some(player)
+                    && !self.is_square_attacked(pos, player.opponent())
+            })
+            .map(|pos| Ply {
+                origin,
+                destination: pos,
+                promotion: None,
+            })
+            .collect()
+    }
+
+    fn get_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
         directions
@@ -671,6 +795,63 @@ impl Board {
             })
     }
 
+    fn square_attacked_by_pieces(&self, origin: Coord, by_player: Player) -> Vec<Piece> {
+        let mut results: Vec<Piece> = vec![];
+
+        Coord::LIST_CARDINAL
+            .iter()
+            .map(|c| (c, Kind::Rook))
+            .chain(Coord::LIST_DIAGONAL.iter().map(|c| (c, Kind::Bishop)))
+            .for_each(|(&dir, piece)| {
+                (1..)
+                    .map(move |i| origin + dir * i)
+                    .take_while(|&c| c.is_valid())
+                    .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
+                    .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
+                    .filter(|&c| self.player_at_square(c) == Some(by_player))
+                    .for_each(|c| {
+                        if self.kind_at_square(c) == Some(piece)
+                            || self.kind_at_square(c) == Some(Kind::Queen)
+                        {
+                            results.push(self.get_piece_by_coord(c).unwrap());
+                        }
+                    })
+            });
+
+        [Coord::L, Coord::R]
+            .iter()
+            .map(|&c| origin + c - by_player.advancing_direction())
+            .filter(|&c| c.is_valid())
+            .map(|c| self.get_piece_by_coord(c))
+            .flatten()
+            .for_each(|p| {
+                if p.kind == Kind::Pawn && p.player == by_player {
+                    results.push(*p);
+                }
+            });
+
+        [
+            (Coord::LIST_KNIGHT, Kind::Knight),
+            (Coord::LIST_CARDINAL_DIAGONAL, Kind::King),
+        ]
+        .into_iter()
+        .for_each(|(coords, piece)| {
+            coords
+                .iter()
+                .map(|&c| origin + c)
+                .filter(|&c| c.is_valid())
+                .map(|c| self.get_piece_by_coord(c))
+                .flatten()
+                .for_each(|p| {
+                    if p.kind == piece && p.player == by_player {
+                        results.push(*p)
+                    }
+                })
+        });
+
+        results
+    }
+
     fn get_castling_moves(&self) -> Vec<Ply> {
         let player = self.turn;
         let mut results: Vec<Ply> = vec![];
@@ -747,7 +928,7 @@ impl Board {
                 return false;
             }
         }
-        self.get_legal_moves(ply.origin).contains(ply)
+        self.new_get_legal_moves(ply.origin).contains(ply)
     }
 
     pub fn verify_status(&self) -> Status {
