@@ -938,68 +938,41 @@ impl Board {
 
     fn get_castling_moves(&self) -> Vec<Ply> {
         let player = self.turn;
+        let row = player.home_row();
+        let permissions = match player {
+            Player::White => (self.white_can_oo, self.white_can_ooo),
+            Player::Black => (self.black_can_oo, self.black_can_ooo),
+        };
+
         let mut results: Vec<Ply> = vec![];
 
-        // Como reduzir estes dois bocados de código quase idênticos?
-        match player {
-            Player::White => {
-                if self.white_can_oo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 5 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 6 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 0, col: 5 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 6 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 0, col: 4 },
-                        destination: Coord { row: 0, col: 6 },
-                        promotion: None,
-                    })
-                }
-                if self.white_can_ooo
-                    && !self.is_square_attacked(Coord { row: 0, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 2 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 0, col: 3 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 0, col: 1 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 2 })
-                    && !self.is_square_occupied(Coord { row: 0, col: 3 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 0, col: 4 },
-                        destination: Coord { row: 0, col: 2 },
-                        promotion: None,
-                    })
-                }
-            }
-            Player::Black => {
-                if self.black_can_oo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 5 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 6 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 7, col: 5 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 6 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 7, col: 4 },
-                        destination: Coord { row: 7, col: 6 },
-                        promotion: None,
-                    })
-                }
-                if self.black_can_ooo
-                    && !self.is_square_attacked(Coord { row: 7, col: 4 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 2 }, player.opponent())
-                    && !self.is_square_attacked(Coord { row: 7, col: 3 }, player.opponent())
-                    && !self.is_square_occupied(Coord { row: 7, col: 1 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 2 })
-                    && !self.is_square_occupied(Coord { row: 7, col: 3 })
-                {
-                    results.push(Ply {
-                        origin: Coord { row: 7, col: 4 },
-                        destination: Coord { row: 7, col: 2 },
-                        promotion: None,
-                    })
-                }
-            }
+        if permissions.0
+            && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
+            && !self.is_square_attacked(Coord { row, col: 5 }, player.opponent())
+            && !self.is_square_attacked(Coord { row, col: 6 }, player.opponent())
+            && !self.is_square_occupied(Coord { row, col: 5 })
+            && !self.is_square_occupied(Coord { row, col: 6 })
+        {
+            results.push(Ply {
+                origin: Coord { row, col: 4 },
+                destination: Coord { row, col: 6 },
+                promotion: None,
+            })
+        }
+
+        if permissions.1
+            && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
+            && !self.is_square_attacked(Coord { row, col: 2 }, player.opponent())
+            && !self.is_square_attacked(Coord { row, col: 3 }, player.opponent())
+            && !self.is_square_occupied(Coord { row, col: 1 })
+            && !self.is_square_occupied(Coord { row, col: 2 })
+            && !self.is_square_occupied(Coord { row, col: 3 })
+        {
+            results.push(Ply {
+                origin: Coord { row, col: 4 },
+                destination: Coord { row, col: 2 },
+                promotion: None,
+            })
         }
 
         results
