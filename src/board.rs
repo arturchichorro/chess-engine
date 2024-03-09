@@ -1,3 +1,5 @@
+use std::path::MAIN_SEPARATOR;
+
 use crate::{
     coord::Coord,
     piece::{Kind, Piece},
@@ -289,34 +291,31 @@ impl Board {
         }
     }
 
+    #[auto_enum]
     fn get_pseudo_legal_moves<'a>(&'a self, coord: Coord) -> impl Iterator<Item = Ply> + 'a {
+        #[auto_enum(Iterator)]
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
+            #[auto_enum(Iterator)]
             match piece_in_square.kind {
-                Kind::Pawn => Box::new(
-                    self.get_pawn_moves(coord)
-                        .chain(self.get_pawn_captures(coord))
-                        .chain(self.get_pawn_en_passant(coord).into_iter()),
-                ) as Box<dyn Iterator<Item = Ply>>,
-                Kind::Knight => {
-                    Box::new(self.get_knight_moves(coord)) as Box<dyn Iterator<Item = Ply>>
+                Kind::Pawn => self
+                    .get_pawn_moves(coord)
+                    .chain(self.get_pawn_captures(coord))
+                    .chain(self.get_pawn_en_passant(coord).into_iter()),
+                Kind::Knight => self.get_knight_moves(coord),
+                Kind::Bishop => {
+                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_DIAGONAL.into_iter())
                 }
-                Kind::Bishop => Box::new(
-                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_DIAGONAL.into_iter()),
-                ) as Box<dyn Iterator<Item = Ply>>,
-                Kind::Rook => Box::new(
-                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL.into_iter()),
-                ) as Box<dyn Iterator<Item = Ply>>,
-                Kind::Queen => {
-                    Box::new(self.get_queen_rook_bishop_moves(
-                        coord,
-                        Coord::LIST_CARDINAL_DIAGONAL.into_iter(),
-                    )) as Box<dyn Iterator<Item = Ply>>
+
+                Kind::Rook => {
+                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL.into_iter())
                 }
-                Kind::King => Box::new(self.get_king_moves(coord).chain(self.get_castling_moves()))
-                    as Box<dyn Iterator<Item = Ply>>,
+
+                Kind::Queen => self
+                    .get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL_DIAGONAL.into_iter()),
+                Kind::King => self.get_king_moves(coord).chain(self.get_castling_moves()),
             }
         } else {
-            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
+            std::iter::empty()
         }
     }
 
@@ -735,41 +734,44 @@ impl Board {
         new_game_state
     }
 
+    #[auto_enum(Iterator)]
     fn get_pawn_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
         let dir = player.advancing_direction();
         let destination = origin + dir;
 
         if self.is_square_occupied(destination) {
-            return Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>;
-        }
-
-        let iter = if destination.row == 0 || destination.row == 7 {
-            Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
-                origin,
-                destination,
-                promotion: Some(promo),
-            })) as Box<dyn Iterator<Item = Ply>>
+            std::iter::empty()
         } else {
-            Box::new(std::iter::once(Ply {
-                origin,
-                destination,
-                promotion: None,
-            })) as Box<dyn Iterator<Item = Ply>>
-        };
+            #[auto_enum(Iterator)]
+            let iter = if destination.row == 0 || destination.row == 7 {
+                Kind::PROMOTIONS.iter().map(move |&promo| Ply {
+                    origin,
+                    destination,
+                    promotion: Some(promo),
+                })
+            } else {
+                std::iter::once(Ply {
+                    origin,
+                    destination,
+                    promotion: None,
+                })
+            };
 
-        let iter = if origin.row == player.pawn_row() && !self.is_square_occupied(destination + dir)
-        {
-            Box::new(iter.chain(std::iter::once(Ply {
-                origin,
-                destination: destination + dir,
-                promotion: None,
-            }))) as Box<dyn Iterator<Item = Ply>>
-        } else {
+            #[auto_enum(Iterator)]
+            let iter =
+                if origin.row == player.pawn_row() && !self.is_square_occupied(destination + dir) {
+                    iter.chain(std::iter::once(Ply {
+                        origin,
+                        destination: destination + dir,
+                        promotion: None,
+                    }))
+                } else {
+                    iter
+                };
+
             iter
-        };
-
-        iter
+        }
     }
 
     #[auto_enum]
