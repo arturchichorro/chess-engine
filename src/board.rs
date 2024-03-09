@@ -6,6 +6,7 @@ use crate::{
     status::Status,
 };
 use auto_enums::auto_enum;
+use rayon::prelude::*;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Board {
@@ -582,6 +583,18 @@ impl Board {
         }
         .into_iter()
         .flat_map(|p| self.get_legal_moves(p.coord))
+    }
+
+    pub fn get_all_moves_par<'a>(&'a self) -> impl ParallelIterator<Item = Ply> + 'a {
+        match self.turn {
+            Player::Black => &self.black_pieces,
+            Player::White => &self.white_pieces,
+        }
+        .into_par_iter()
+        .map(|p| self.get_legal_moves(p.coord))
+        .flatten()
+
+        todo!()
     }
 
     fn get_king_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
