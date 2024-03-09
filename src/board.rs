@@ -303,7 +303,9 @@ impl Board {
                     .concat()
                     // TODO: returns iter
                 }
-                Kind::Knight => self.get_knight_moves(coord, &Coord::LIST_KNIGHT), // TODO: returns iter
+                Kind::Knight => self
+                    .get_knight_moves_trial(coord, &Coord::LIST_KNIGHT)
+                    .collect(), // TODO: returns iter
                 Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL), // TODO: returns iter
                 Kind::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
                 Kind::Queen => {
@@ -320,25 +322,7 @@ impl Board {
         }
     }
 
-    // Returns a vector with all the legal moves possible for the piece at position coord
-    // TODO: returns iter
-    fn get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
-        let pseudo_legal_moves = self.get_pseudo_legal_moves(coord);
-        let current_turn = self.turn;
-        let mut results: Vec<Ply> = vec![];
-
-        pseudo_legal_moves.iter().for_each(|m| {
-            let pos_after_move = self.make_move(*m);
-
-            let king_pos = pos_after_move.find_king(current_turn);
-            if !pos_after_move.is_square_attacked(king_pos, pos_after_move.turn) {
-                results.push(*m);
-            };
-        });
-        results
-    }
-
-    pub fn new_get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+    pub fn get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             let king_loc = match self.turn {
                 Player::Black => self.black_king_loc,
@@ -585,22 +569,13 @@ impl Board {
     }
     // Gives all posible moves in a position
     pub fn get_all_moves(&self) -> Vec<Ply> {
-        let mut moves: Vec<Ply> = vec![];
-
         match self.turn {
-            Player::Black => {
-                for p in &self.black_pieces {
-                    moves.extend(self.new_get_legal_moves(p.coord));
-                }
-            }
-            Player::White => {
-                for p in &self.white_pieces {
-                    moves.extend(self.new_get_legal_moves(p.coord));
-                }
-            }
+            Player::Black => &self.black_pieces,
+            Player::White => &self.white_pieces,
         }
-
-        moves
+        .into_iter()
+        .flat_map(|p| self.get_legal_moves(p.coord))
+        .collect()
     }
 
     fn get_king_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
@@ -635,6 +610,27 @@ impl Board {
                 promotion: None,
             })
             .collect()
+    }
+
+    fn get_knight_moves_trial<'a, 'b>(
+        &'a self,
+        origin: Coord,
+        directions: &'b [Coord],
+    ) -> impl Iterator<Item = Ply> + 'a
+    where
+        'b: 'a,
+    {
+        let player = self.player_at_square(origin).unwrap();
+
+        directions
+            .iter()
+            .map(move |&delta| origin + delta)
+            .filter(move |&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
+            .map(move |pos| Ply {
+                origin,
+                destination: pos,
+                promotion: None,
+            })
     }
 
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
@@ -1024,7 +1020,7 @@ impl Board {
                 return false;
             }
         }
-        self.new_get_legal_moves(ply.origin).contains(ply)
+        self.get_legal_moves(ply.origin).contains(ply)
     }
 
     pub fn verify_status(&self) -> Status {
