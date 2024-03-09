@@ -591,10 +591,7 @@ impl Board {
             Player::White => &self.white_pieces,
         }
         .into_par_iter()
-        .map(|p| self.get_legal_moves(p.coord))
-        .flatten()
-
-        todo!()
+        .flat_map_iter(|p| self.get_legal_moves(p.coord))
     }
 
     fn get_king_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
