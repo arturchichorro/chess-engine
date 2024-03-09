@@ -327,17 +327,18 @@ impl Board {
 
             let checking_pieces = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
 
-            if checking_pieces.len() == 1 {
+            #[auto_enum(Iterator)]
+            let result = if checking_pieces.len() == 1 {
+                #[auto_enum(Iterator)]
                 match piece_in_square.kind {
-                    Kind::King => {
-                        Box::new(self.get_king_moves(coord)) as Box<dyn Iterator<Item = Ply>>
-                    }
+                    Kind::King => self.get_king_moves(coord),
 
                     _ => {
                         if let Some(_) = self.is_piece_pinned(*piece_in_square) {
                             return std::iter::empty();
                         }
 
+                        #[auto_enum(Iterator)]
                         match checking_pieces[0].kind {
                             Kind::Pawn => {
                                 if let Some(en_passant_square) = self.en_passant_square {
@@ -355,17 +356,13 @@ impl Board {
                                     }
                                 }
 
-                                Box::new(
-                                    self.get_pseudo_legal_moves(coord).filter(move |ply| {
-                                        ply.destination == checking_pieces[0].coord
-                                    }),
-                                ) as Box<dyn Iterator<Item = Ply>>
-                            }
-                            Kind::Knight => Box::new(
                                 self.get_pseudo_legal_moves(coord)
-                                    .filter(move |ply| ply.destination == checking_pieces[0].coord),
-                            )
-                                as Box<dyn Iterator<Item = Ply>>,
+                                    .filter(move |ply| ply.destination == checking_pieces[0].coord)
+                            }
+                            Kind::Knight => self
+                                .get_pseudo_legal_moves(coord)
+                                .filter(move |ply| ply.destination == checking_pieces[0].coord),
+
                             Kind::Rook | Kind::Bishop | Kind::Queen => {
                                 let dir = Coord::find_dir_between_coords(
                                     checking_pieces[0].coord,
@@ -379,60 +376,57 @@ impl Board {
                                     pos = pos + dir;
                                 }
 
-                                Box::new(self.get_pseudo_legal_moves(coord).filter(move |ply| {
+                                self.get_pseudo_legal_moves(coord).filter(move |ply| {
                                     possible_destinations.contains(&ply.destination)
-                                })) as Box<dyn Iterator<Item = Ply>>
+                                })
                             }
                             Kind::King => panic!("King cannot be the checking piece"),
                         }
                     }
                 }
             } else if checking_pieces.len() == 2 {
+                #[auto_enum(Iterator)]
                 match piece_in_square.kind {
-                    Kind::King => {
-                        Box::new(self.get_king_moves(coord)) as Box<dyn Iterator<Item = Ply>>
-                    }
-                    _ => Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>,
+                    Kind::King => self.get_king_moves(coord),
+                    _ => std::iter::empty(),
                 }
             } else {
+                #[auto_enum(Iterator)]
                 if let Some(pin_direction) = self.is_piece_pinned(*piece_in_square) {
+                    #[auto_enum(Iterator)]
                     match piece_in_square.kind {
-                        Kind::Pawn => Box::new(
-                            self.get_pawn_moves(coord)
-                                .chain(self.get_pawn_captures(coord))
-                                .chain(self.get_pawn_en_passant(coord))
-                                // TODO: refactor using pseudo_legal_moves
-                                .filter(move |ply| {
-                                    ply.destination == piece_in_square.coord + pin_direction
-                                        || ply.destination
-                                            == piece_in_square.coord + 2 * pin_direction
-                                }),
-                        ) as Box<dyn Iterator<Item = Ply>>,
-                        Kind::Knight => {
-                            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
-                        }
-                        Kind::Rook => Box::new(self.get_queen_rook_bishop_moves(
+                        Kind::Pawn => self
+                            .get_pawn_moves(coord)
+                            .chain(self.get_pawn_captures(coord))
+                            .chain(self.get_pawn_en_passant(coord))
+                            // TODO: refactor using pseudo_legal_moves
+                            .filter(move |ply| {
+                                ply.destination == piece_in_square.coord + pin_direction
+                                    || ply.destination == piece_in_square.coord + 2 * pin_direction
+                            }),
+
+                        Kind::Knight => std::iter::empty(),
+                        Kind::Rook => self.get_queen_rook_bishop_moves(
                             coord,
                             Coord::LIST_CARDINAL.into_iter().filter(move |&dir| {
                                 dir == pin_direction || dir == -1 * pin_direction
                             }),
-                        )) as Box<dyn Iterator<Item = Ply>>,
-                        Kind::Bishop => Box::new(self.get_queen_rook_bishop_moves(
+                        ),
+                        Kind::Bishop => self.get_queen_rook_bishop_moves(
                             coord,
                             Coord::LIST_DIAGONAL.into_iter().filter(move |&dir| {
                                 dir == pin_direction || dir == -1 * pin_direction
                             }),
-                        )) as Box<dyn Iterator<Item = Ply>>,
-                        Kind::Queen => Box::new(
-                            self.get_queen_rook_bishop_moves(
-                                coord,
-                                Coord::LIST_CARDINAL_DIAGONAL
-                                    .into_iter()
-                                    .filter(move |&dir| {
-                                        dir == pin_direction || dir == -1 * pin_direction
-                                    }),
-                            ),
-                        ) as Box<dyn Iterator<Item = Ply>>,
+                        ),
+                        Kind::Queen => self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_CARDINAL_DIAGONAL
+                                .into_iter()
+                                .filter(move |&dir| {
+                                    dir == pin_direction || dir == -1 * pin_direction
+                                }),
+                        ),
+
                         Kind::King => unreachable!(),
                     }
                 } else {
@@ -444,13 +438,17 @@ impl Board {
                             .chain(self.get_pawn_captures(coord));
                     }
 
-                    Box::new(self.get_pseudo_legal_moves(coord)) as Box<dyn Iterator<Item = Ply>>
+                    self.get_pseudo_legal_moves(coord)
                 }
-            }
+            };
+
+            result
         } else {
             std::iter::empty()
         }
     }
+
+    fn x() {}
 
     pub fn is_piece_pinned(&self, p: Piece) -> Option<Coord> {
         if p.kind == Kind::King {
