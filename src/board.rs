@@ -325,11 +325,18 @@ impl Board {
                 Player::White => self.white_king_loc,
             };
 
-            let iterator = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
-            let checking_pieces: Vec<Piece> = iterator.collect();
+            let mut iterator = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
+            let first_checking_piece = iterator.next();
+            let second_checking_piece = iterator.next();
 
             #[auto_enum(Iterator)]
-            let result = if checking_pieces.len() == 1 {
+            let result = if second_checking_piece.is_some() {
+                #[auto_enum(Iterator)]
+                match piece_in_square.kind {
+                    Kind::King => self.get_king_moves(coord),
+                    _ => std::iter::empty(),
+                }
+            } else if let Some(first_checking_piece) = first_checking_piece {
                 #[auto_enum(Iterator)]
                 match piece_in_square.kind {
                     Kind::King => self.get_king_moves(coord),
@@ -340,39 +347,40 @@ impl Board {
                         }
 
                         #[auto_enum(Iterator)]
-                        match checking_pieces[0].kind {
+                        match first_checking_piece.kind {
                             Kind::Pawn => {
                                 if let Some(en_passant_square) = self.en_passant_square {
-                                    if checking_pieces[0].coord
+                                    if first_checking_piece.coord
                                         == en_passant_square
-                                            + checking_pieces[0].player.advancing_direction()
+                                            + first_checking_piece.player.advancing_direction()
                                         && piece_in_square.kind == Kind::Pawn
                                     {
                                         return self.get_pseudo_legal_moves(coord).filter(
                                             move |ply| {
-                                                ply.destination == checking_pieces[0].coord
+                                                ply.destination == first_checking_piece.coord
                                                     || ply.destination == en_passant_square
                                             },
                                         );
                                     }
                                 }
 
-                                self.get_pseudo_legal_moves(coord)
-                                    .filter(move |ply| ply.destination == checking_pieces[0].coord)
+                                self.get_pseudo_legal_moves(coord).filter(move |ply| {
+                                    ply.destination == first_checking_piece.coord
+                                })
                             }
                             Kind::Knight => self
                                 .get_pseudo_legal_moves(coord)
-                                .filter(move |ply| ply.destination == checking_pieces[0].coord),
+                                .filter(move |ply| ply.destination == first_checking_piece.coord),
 
                             Kind::Rook | Kind::Bishop | Kind::Queen => {
                                 let dir = Coord::find_dir_between_coords(
-                                    checking_pieces[0].coord,
+                                    first_checking_piece.coord,
                                     king_loc,
                                 );
 
                                 let mut pos = king_loc + dir;
                                 let mut possible_destinations: Vec<Coord> = vec![];
-                                while pos != checking_pieces[0].coord + dir {
+                                while pos != first_checking_piece.coord + dir {
                                     possible_destinations.push(pos);
                                     pos = pos + dir;
                                 }
@@ -384,12 +392,6 @@ impl Board {
                             Kind::King => panic!("King cannot be the checking piece"),
                         }
                     }
-                }
-            } else if checking_pieces.len() == 2 {
-                #[auto_enum(Iterator)]
-                match piece_in_square.kind {
-                    Kind::King => self.get_king_moves(coord),
-                    _ => std::iter::empty(),
                 }
             } else {
                 #[auto_enum(Iterator)]
