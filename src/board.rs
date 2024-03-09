@@ -290,20 +290,16 @@ impl Board {
         }
     }
 
-    // TODO: returns iter
     fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             match piece_in_square.kind {
-                Kind::Pawn => {
-                    vec![
-                        self.get_pawn_moves(coord),
-                        self.get_pawn_captures(coord),
-                        self.get_pawn_en_passant(coord).into_iter().collect(),
-                    ]
-                    .concat()
-                    // TODO: returns iter
-                }
-                Kind::Knight => self.get_knight_moves(coord).collect(), // TODO: returns iter
+                Kind::Pawn => vec![
+                    self.get_pawn_moves(coord).collect::<Vec<_>>(),
+                    self.get_pawn_captures(coord).collect(),
+                    self.get_pawn_en_passant(coord).into_iter().collect(),
+                ]
+                .concat(),
+                Kind::Knight => self.get_knight_moves(coord).collect(),
                 Kind::Bishop => self
                     .get_queen_rook_bishop_moves(coord, Coord::LIST_DIAGONAL.into_iter())
                     .collect(),
@@ -314,8 +310,8 @@ impl Board {
                     .get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL_DIAGONAL.into_iter())
                     .collect(),
                 Kind::King => vec![
-                    self.get_king_moves(coord).collect(), // TODO: returns iter
-                    self.get_castling_moves(),            // TODO: returns iter
+                    self.get_king_moves(coord).collect::<Vec<_>>(),
+                    self.get_castling_moves().collect(),
                 ]
                 .concat(),
             }
@@ -401,22 +397,13 @@ impl Board {
                     }
                 }
             } else {
-                // let x: Vec<_> = self
-                //     .get_queen_rook_bishop_moves_trial(
-                //         coord,
-                //         Coord::LIST_CARDINAL
-                //             .into_iter()
-                //             .filter(|&dir| dir == pin_direction || dir == -1 * pin_direction),
-                //     )
-                //     .collect();
-
                 if let Some(pin_direction) = self.is_piece_pinned(*piece_in_square) {
                     match piece_in_square.kind {
                         Kind::Pawn => self
                             .get_pawn_moves(coord)
-                            .into_iter()
-                            .chain(self.get_pawn_captures(coord).into_iter())
+                            .chain(self.get_pawn_captures(coord))
                             .chain(self.get_pawn_en_passant(coord))
+                            // TODO: refactor using pseudo_legal_moves
                             .filter(|ply| {
                                 ply.destination == piece_in_square.coord + pin_direction
                                     || ply.destination == piece_in_square.coord + 2 * pin_direction
@@ -453,8 +440,11 @@ impl Board {
                     if piece_in_square.kind == Kind::Pawn
                         && self.is_pawn_enpassant_pinned(*piece_in_square)
                     {
-                        return vec![self.get_pawn_moves(coord), self.get_pawn_captures(coord)]
-                            .concat();
+                        return vec![
+                            self.get_pawn_moves(coord).collect::<Vec<_>>(),
+                            self.get_pawn_captures(coord).collect(),
+                        ]
+                        .concat();
                     }
                     self.get_pseudo_legal_moves(coord)
                 }
@@ -745,60 +735,60 @@ impl Board {
         new_game_state
     }
 
-    fn get_pawn_moves(&self, origin: Coord) -> Vec<Ply> {
+    fn get_pawn_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
         let dir = player.advancing_direction();
+        let destination = origin + dir;
 
-        let mut results: Vec<Ply> = vec![];
+        if self.is_square_occupied(destination) {
+            return Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>;
+        }
 
-        if !self.is_square_occupied(origin + dir) {
-            if (origin + dir).row == 0 || (origin + dir).row == 7 {
-                for promo in Kind::PROMOTIONS {
-                    results.push(Ply {
-                        origin,
-                        destination: origin + dir,
-                        promotion: Some(promo),
-                    })
-                }
-            } else {
-                results.push(Ply {
-                    origin,
-                    destination: origin + dir,
-                    promotion: None,
-                })
-            }
+        let iter = if destination.row == 0 || destination.row == 7 {
+            Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
+                origin,
+                destination,
+                promotion: Some(promo),
+            })) as Box<dyn Iterator<Item = Ply>>
         } else {
-            return results;
-        }
+            Box::new(std::iter::once(Ply {
+                origin,
+                destination,
+                promotion: None,
+            })) as Box<dyn Iterator<Item = Ply>>
+        };
 
-        if origin.row == 1 && player == Player::White || origin.row == 6 && player == Player::Black
+        let iter = if origin.row == player.pawn_row() && !self.is_square_occupied(destination + dir)
         {
-            if !self.is_square_occupied(origin + 2 * dir) {
-                results.push(Ply {
-                    origin,
-                    destination: origin + 2 * dir,
-                    promotion: None,
-                })
-            }
-        }
+            Box::new(iter.chain(std::iter::once(Ply {
+                origin,
+                destination: destination + dir,
+                promotion: None,
+            }))) as Box<dyn Iterator<Item = Ply>>
+        } else {
+            iter
+        };
 
-        results
+        iter
     }
 
-    fn get_pawn_captures(&self, origin: Coord) -> Vec<Ply> {
+    fn get_pawn_captures<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
 
         [Coord::L, Coord::R]
             .iter()
-            .map(|&c| origin + c + player.advancing_direction())
-            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) == Some(player.opponent()))
-            .map(|pos| {
+            .map(move |&c| origin + c + player.advancing_direction())
+            .filter(move |&pos| {
+                pos.is_valid() && self.player_at_square(pos) == Some(player.opponent())
+            })
+            .map(move |pos| {
                 if pos.row == 7 || pos.row == 0 {
                     Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
                         origin,
                         destination: pos,
                         promotion: Some(promo),
                     })) as Box<dyn Iterator<Item = Ply>>
+                    // TODO: remove Box dyn?
                 } else {
                     Box::new(std::iter::once(Ply {
                         origin,
@@ -808,26 +798,28 @@ impl Board {
                 }
             })
             .flatten()
-            .collect()
     }
 
     fn get_pawn_en_passant(&self, origin: Coord) -> Option<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
-        if let Some(en_passant_square) = self.en_passant_square {
-            if (origin + player.advancing_direction()).row == en_passant_square.row {
-                if (origin.col + 1 == en_passant_square.col)
-                    || (origin.col - 1 == en_passant_square.col)
-                {
-                    return Some(Ply {
-                        origin,
-                        destination: en_passant_square,
-                        promotion: None,
-                    });
-                }
-            }
+        let Some(en_passant_square) = self.en_passant_square else {
+            return None;
+        };
+
+        if (origin + player.advancing_direction()).row != en_passant_square.row {
+            return None;
         }
-        None
+
+        if (origin.col + 1 == en_passant_square.col) || (origin.col - 1 == en_passant_square.col) {
+            Some(Ply {
+                origin,
+                destination: en_passant_square,
+                promotion: None,
+            })
+        } else {
+            None
+        }
     }
 
     pub fn is_square_attacked(&self, origin: Coord, by_player: Player) -> bool {
@@ -936,7 +928,7 @@ impl Board {
         results
     }
 
-    fn get_castling_moves(&self) -> Vec<Ply> {
+    fn get_castling_moves<'a>(&'a self) -> impl Iterator<Item = Ply> + 'a {
         let player = self.turn;
         let row = player.home_row();
         let permissions = match player {
@@ -944,38 +936,38 @@ impl Board {
             Player::Black => (self.black_can_oo, self.black_can_ooo),
         };
 
-        let mut results: Vec<Ply> = vec![];
+        (0..2).filter_map(move |i| match i {
+            0 if permissions.0
+                && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
+                && !self.is_square_attacked(Coord { row, col: 5 }, player.opponent())
+                && !self.is_square_attacked(Coord { row, col: 6 }, player.opponent())
+                && !self.is_square_occupied(Coord { row, col: 5 })
+                && !self.is_square_occupied(Coord { row, col: 6 }) =>
+            {
+                Some(Ply {
+                    origin: Coord { row, col: 4 },
+                    destination: Coord { row, col: 6 },
+                    promotion: None,
+                })
+            }
 
-        if permissions.0
-            && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
-            && !self.is_square_attacked(Coord { row, col: 5 }, player.opponent())
-            && !self.is_square_attacked(Coord { row, col: 6 }, player.opponent())
-            && !self.is_square_occupied(Coord { row, col: 5 })
-            && !self.is_square_occupied(Coord { row, col: 6 })
-        {
-            results.push(Ply {
-                origin: Coord { row, col: 4 },
-                destination: Coord { row, col: 6 },
-                promotion: None,
-            })
-        }
+            1 if permissions.1
+                && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
+                && !self.is_square_attacked(Coord { row, col: 2 }, player.opponent())
+                && !self.is_square_attacked(Coord { row, col: 3 }, player.opponent())
+                && !self.is_square_occupied(Coord { row, col: 1 })
+                && !self.is_square_occupied(Coord { row, col: 2 })
+                && !self.is_square_occupied(Coord { row, col: 3 }) =>
+            {
+                Some(Ply {
+                    origin: Coord { row, col: 4 },
+                    destination: Coord { row, col: 2 },
+                    promotion: None,
+                })
+            }
 
-        if permissions.1
-            && !self.is_square_attacked(Coord { row, col: 4 }, player.opponent())
-            && !self.is_square_attacked(Coord { row, col: 2 }, player.opponent())
-            && !self.is_square_attacked(Coord { row, col: 3 }, player.opponent())
-            && !self.is_square_occupied(Coord { row, col: 1 })
-            && !self.is_square_occupied(Coord { row, col: 2 })
-            && !self.is_square_occupied(Coord { row, col: 3 })
-        {
-            results.push(Ply {
-                origin: Coord { row, col: 4 },
-                destination: Coord { row, col: 2 },
-                promotion: None,
-            })
-        }
-
-        results
+            _ => None,
+        })
     }
 
     pub fn arbiter(&self, ply: &Ply) -> bool {

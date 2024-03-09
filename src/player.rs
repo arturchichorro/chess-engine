@@ -29,6 +29,13 @@ impl Player {
             Player::Black => 7,
         }
     }
+
+    pub fn pawn_row(&self) -> i32 {
+        match self {
+            Player::White => 1,
+            Player::Black => 6,
+        }
+    }
 }
 
 impl Default for Player {
