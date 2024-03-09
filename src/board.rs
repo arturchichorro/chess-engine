@@ -378,20 +378,23 @@ impl Board {
                                     king_loc,
                                 );
 
-                                // TODO: better/faster code here
-                                let mut pos = king_loc + dir;
-
-                                // TODO: --- remove v
-                                let mut possible_destinations: Vec<Coord> = vec![];
-                                while pos != first_checking_piece.coord + dir {
-                                    possible_destinations.push(pos);
-                                    pos = pos + dir;
-                                }
-                                // TODO: --- remove ^
+                                let pos = king_loc + dir;
+                                let row_min = pos.row.min(first_checking_piece.coord.row);
+                                let col_min = pos.col.min(first_checking_piece.coord.col);
+                                let row_max = pos.row.max(first_checking_piece.coord.row);
+                                let col_max = pos.col.max(first_checking_piece.coord.col);
 
                                 self.get_pseudo_legal_moves(coord).filter(move |ply| {
-                                    possible_destinations.contains(&ply.destination)
-                                    // TODO: x > 0 && y < 0 etc
+                                    ply.destination.row >= row_min
+                                        && ply.destination.col >= col_min
+                                        && ply.destination.row <= row_max
+                                        && ply.destination.col <= col_max
+                                        && if dir.row.abs() == dir.col.abs() {
+                                            (ply.destination.row - king_loc.row).abs()
+                                                == (ply.destination.col - king_loc.col).abs()
+                                        } else {
+                                            true
+                                        }
                                 })
                             }
                             Kind::King => panic!("King cannot be the checking piece"),
