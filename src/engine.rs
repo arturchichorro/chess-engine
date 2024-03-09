@@ -1,7 +1,7 @@
 use crate::{board::Board, piece::Kind, player::Player, ply::Ply};
 
 pub fn search(board: Board, depth: i32) -> i32 {
-    let move_vec: Vec<Ply> = board.get_all_moves().collect();
+    let move_vec: Vec<Ply> = board.get_all_moves().collect(); // remove collect, use iter resturn value directly
 
     if depth == 0 {
         return evaluate(board);
