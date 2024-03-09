@@ -108,7 +108,7 @@ pub fn perft_suite() -> () {
         let game = Game::new_from_fen(fen);
         for (depth, value) in checks {
             let start = Instant::now();
-            let result = perft(game.states.last().unwrap(), depth, 1);
+            let result = perft(game.states.last().unwrap(), depth, 3);
             let duration = Instant::now().duration_since(start);
             println!("Position {fen}, depth {depth}, result {result}, expected {value}, took {duration:?}, speed {:.2}", result as f64 / duration.as_secs_f64());
             // assert_eq!(result, value);
