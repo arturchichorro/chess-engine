@@ -378,15 +378,20 @@ impl Board {
                                     king_loc,
                                 );
 
+                                // TODO: better/faster code here
                                 let mut pos = king_loc + dir;
+
+                                // TODO: --- remove v
                                 let mut possible_destinations: Vec<Coord> = vec![];
                                 while pos != first_checking_piece.coord + dir {
                                     possible_destinations.push(pos);
                                     pos = pos + dir;
                                 }
+                                // TODO: --- remove ^
 
                                 self.get_pseudo_legal_moves(coord).filter(move |ply| {
                                     possible_destinations.contains(&ply.destination)
+                                    // TODO: x > 0 && y < 0 etc
                                 })
                             }
                             Kind::King => panic!("King cannot be the checking piece"),
