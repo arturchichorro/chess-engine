@@ -5,6 +5,7 @@ use crate::{
     ply::Ply,
     status::Status,
 };
+use auto_enums::auto_enum;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Board {
@@ -771,6 +772,7 @@ impl Board {
         iter
     }
 
+    #[auto_enum]
     fn get_pawn_captures<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
 
@@ -781,19 +783,19 @@ impl Board {
                 pos.is_valid() && self.player_at_square(pos) == Some(player.opponent())
             })
             .map(move |pos| {
+                #[auto_enum(Iterator)]
                 if pos.row == 7 || pos.row == 0 {
-                    Box::new(Kind::PROMOTIONS.iter().map(move |&promo| Ply {
+                    Kind::PROMOTIONS.iter().map(move |&promo| Ply {
                         origin,
                         destination: pos,
                         promotion: Some(promo),
-                    })) as Box<dyn Iterator<Item = Ply>>
-                    // TODO: remove Box dyn?
+                    })
                 } else {
-                    Box::new(std::iter::once(Ply {
+                    std::iter::once(Ply {
                         origin,
                         destination: pos,
                         promotion: None,
-                    })) as Box<dyn Iterator<Item = Ply>>
+                    })
                 }
             })
             .flatten()
