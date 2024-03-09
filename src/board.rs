@@ -1,8 +1,6 @@
-use std::num::NonZeroU64;
-
 use crate::{
-    coord::{self, Coord},
-    piece::{self, Kind, Piece},
+    coord::Coord,
+    piece::{Kind, Piece},
     player::Player,
     ply::Ply,
     status::Status,
@@ -290,37 +288,38 @@ impl Board {
         }
     }
 
-    fn get_pseudo_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+    fn get_pseudo_legal_moves<'a>(&'a self, coord: Coord) -> impl Iterator<Item = Ply> + 'a {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             match piece_in_square.kind {
-                Kind::Pawn => vec![
-                    self.get_pawn_moves(coord).collect::<Vec<_>>(),
-                    self.get_pawn_captures(coord).collect(),
-                    self.get_pawn_en_passant(coord).into_iter().collect(),
-                ]
-                .concat(),
-                Kind::Knight => self.get_knight_moves(coord).collect(),
-                Kind::Bishop => self
-                    .get_queen_rook_bishop_moves(coord, Coord::LIST_DIAGONAL.into_iter())
-                    .collect(),
-                Kind::Rook => self
-                    .get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL.into_iter())
-                    .collect(),
-                Kind::Queen => self
-                    .get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL_DIAGONAL.into_iter())
-                    .collect(),
-                Kind::King => vec![
-                    self.get_king_moves(coord).collect::<Vec<_>>(),
-                    self.get_castling_moves().collect(),
-                ]
-                .concat(),
+                Kind::Pawn => Box::new(
+                    self.get_pawn_moves(coord)
+                        .chain(self.get_pawn_captures(coord))
+                        .chain(self.get_pawn_en_passant(coord).into_iter()),
+                ) as Box<dyn Iterator<Item = Ply>>,
+                Kind::Knight => {
+                    Box::new(self.get_knight_moves(coord)) as Box<dyn Iterator<Item = Ply>>
+                }
+                Kind::Bishop => Box::new(
+                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_DIAGONAL.into_iter()),
+                ) as Box<dyn Iterator<Item = Ply>>,
+                Kind::Rook => Box::new(
+                    self.get_queen_rook_bishop_moves(coord, Coord::LIST_CARDINAL.into_iter()),
+                ) as Box<dyn Iterator<Item = Ply>>,
+                Kind::Queen => {
+                    Box::new(self.get_queen_rook_bishop_moves(
+                        coord,
+                        Coord::LIST_CARDINAL_DIAGONAL.into_iter(),
+                    )) as Box<dyn Iterator<Item = Ply>>
+                }
+                Kind::King => Box::new(self.get_king_moves(coord).chain(self.get_castling_moves()))
+                    as Box<dyn Iterator<Item = Ply>>,
             }
         } else {
-            vec![]
+            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
         }
     }
 
-    pub fn get_legal_moves(&self, coord: Coord) -> Vec<Ply> {
+    pub fn get_legal_moves<'a>(&'a self, coord: Coord) -> impl Iterator<Item = Ply> + 'a {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             let king_loc = match self.turn {
                 Player::Black => self.black_king_loc,
@@ -331,11 +330,13 @@ impl Board {
 
             if checking_pieces.len() == 1 {
                 match piece_in_square.kind {
-                    Kind::King => self.get_king_moves(coord).collect(),
+                    Kind::King => {
+                        Box::new(self.get_king_moves(coord)) as Box<dyn Iterator<Item = Ply>>
+                    }
 
                     _ => {
                         if let Some(_) = self.is_piece_pinned(*piece_in_square) {
-                            return vec![];
+                            return Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>;
                         }
 
                         match checking_pieces[0].kind {
@@ -346,27 +347,27 @@ impl Board {
                                             + checking_pieces[0].player.advancing_direction()
                                         && piece_in_square.kind == Kind::Pawn
                                     {
-                                        return self
-                                            .get_pseudo_legal_moves(coord)
-                                            .into_iter()
-                                            .filter(|ply| {
+                                        return Box::new(self.get_pseudo_legal_moves(coord).filter(
+                                            move |ply| {
                                                 ply.destination == checking_pieces[0].coord
                                                     || ply.destination == en_passant_square
-                                            })
-                                            .collect();
+                                            },
+                                        ))
+                                            as Box<dyn Iterator<Item = Ply>>;
                                     }
                                 }
 
-                                self.get_pseudo_legal_moves(coord)
-                                    .into_iter()
-                                    .filter(|ply| ply.destination == checking_pieces[0].coord)
-                                    .collect()
+                                Box::new(
+                                    self.get_pseudo_legal_moves(coord).filter(move |ply| {
+                                        ply.destination == checking_pieces[0].coord
+                                    }),
+                                ) as Box<dyn Iterator<Item = Ply>>
                             }
-                            Kind::Knight => self
-                                .get_pseudo_legal_moves(coord)
-                                .into_iter()
-                                .filter(|ply| ply.destination == checking_pieces[0].coord)
-                                .collect(),
+                            Kind::Knight => Box::new(
+                                self.get_pseudo_legal_moves(coord)
+                                    .filter(move |ply| ply.destination == checking_pieces[0].coord),
+                            )
+                                as Box<dyn Iterator<Item = Ply>>,
                             Kind::Rook | Kind::Bishop | Kind::Queen => {
                                 let dir = Coord::find_dir_between_coords(
                                     checking_pieces[0].coord,
@@ -380,10 +381,9 @@ impl Board {
                                     pos = pos + dir;
                                 }
 
-                                self.get_pseudo_legal_moves(coord)
-                                    .into_iter()
-                                    .filter(|ply| possible_destinations.contains(&ply.destination))
-                                    .collect()
+                                Box::new(self.get_pseudo_legal_moves(coord).filter(move |ply| {
+                                    possible_destinations.contains(&ply.destination)
+                                })) as Box<dyn Iterator<Item = Ply>>
                             }
                             Kind::King => panic!("King cannot be the checking piece"),
                         }
@@ -391,66 +391,67 @@ impl Board {
                 }
             } else if checking_pieces.len() == 2 {
                 match piece_in_square.kind {
-                    Kind::King => self.get_king_moves(coord).collect(),
-                    _ => {
-                        vec![]
+                    Kind::King => {
+                        Box::new(self.get_king_moves(coord)) as Box<dyn Iterator<Item = Ply>>
                     }
+                    _ => Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>,
                 }
             } else {
                 if let Some(pin_direction) = self.is_piece_pinned(*piece_in_square) {
                     match piece_in_square.kind {
-                        Kind::Pawn => self
-                            .get_pawn_moves(coord)
-                            .chain(self.get_pawn_captures(coord))
-                            .chain(self.get_pawn_en_passant(coord))
-                            // TODO: refactor using pseudo_legal_moves
-                            .filter(|ply| {
-                                ply.destination == piece_in_square.coord + pin_direction
-                                    || ply.destination == piece_in_square.coord + 2 * pin_direction
-                            })
-                            .collect(),
-                        Kind::Knight => vec![],
-                        Kind::Rook => self
-                            .get_queen_rook_bishop_moves(
-                                coord,
-                                Coord::LIST_CARDINAL.into_iter().filter(|&dir| {
-                                    dir == pin_direction || dir == -1 * pin_direction
+                        Kind::Pawn => Box::new(
+                            self.get_pawn_moves(coord)
+                                .chain(self.get_pawn_captures(coord))
+                                .chain(self.get_pawn_en_passant(coord))
+                                // TODO: refactor using pseudo_legal_moves
+                                .filter(move |ply| {
+                                    ply.destination == piece_in_square.coord + pin_direction
+                                        || ply.destination
+                                            == piece_in_square.coord + 2 * pin_direction
                                 }),
-                            )
-                            .collect(),
-                        Kind::Bishop => self
-                            .get_queen_rook_bishop_moves(
+                        ) as Box<dyn Iterator<Item = Ply>>,
+                        Kind::Knight => {
+                            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
+                        }
+                        Kind::Rook => Box::new(self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_CARDINAL.into_iter().filter(move |&dir| {
+                                dir == pin_direction || dir == -1 * pin_direction
+                            }),
+                        )) as Box<dyn Iterator<Item = Ply>>,
+                        Kind::Bishop => Box::new(self.get_queen_rook_bishop_moves(
+                            coord,
+                            Coord::LIST_DIAGONAL.into_iter().filter(move |&dir| {
+                                dir == pin_direction || dir == -1 * pin_direction
+                            }),
+                        )) as Box<dyn Iterator<Item = Ply>>,
+                        Kind::Queen => Box::new(
+                            self.get_queen_rook_bishop_moves(
                                 coord,
-                                Coord::LIST_DIAGONAL.into_iter().filter(|&dir| {
-                                    dir == pin_direction || dir == -1 * pin_direction
-                                }),
-                            )
-                            .collect(),
-                        Kind::Queen => self
-                            .get_queen_rook_bishop_moves(
-                                coord,
-                                Coord::LIST_CARDINAL_DIAGONAL.into_iter().filter(|&dir| {
-                                    dir == pin_direction || dir == -1 * pin_direction
-                                }),
-                            )
-                            .collect(),
+                                Coord::LIST_CARDINAL_DIAGONAL
+                                    .into_iter()
+                                    .filter(move |&dir| {
+                                        dir == pin_direction || dir == -1 * pin_direction
+                                    }),
+                            ),
+                        ) as Box<dyn Iterator<Item = Ply>>,
                         Kind::King => unreachable!(),
                     }
                 } else {
                     if piece_in_square.kind == Kind::Pawn
                         && self.is_pawn_enpassant_pinned(*piece_in_square)
                     {
-                        return vec![
-                            self.get_pawn_moves(coord).collect::<Vec<_>>(),
-                            self.get_pawn_captures(coord).collect(),
-                        ]
-                        .concat();
+                        return Box::new(
+                            self.get_pawn_moves(coord)
+                                .chain(self.get_pawn_captures(coord)),
+                        ) as Box<dyn Iterator<Item = Ply>>;
                     }
-                    self.get_pseudo_legal_moves(coord)
+
+                    Box::new(self.get_pseudo_legal_moves(coord)) as Box<dyn Iterator<Item = Ply>>
                 }
             }
         } else {
-            vec![]
+            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
         }
     }
 
@@ -570,15 +571,13 @@ impl Board {
     }
 
     // Gives all posible moves in a position
-    // TODO: iterator?
-    pub fn get_all_moves(&self) -> Vec<Ply> {
+    pub fn get_all_moves<'a>(&'a self) -> impl Iterator<Item = Ply> + 'a {
         match self.turn {
             Player::Black => &self.black_pieces,
             Player::White => &self.white_pieces,
         }
         .into_iter()
         .flat_map(|p| self.get_legal_moves(p.coord))
-        .collect()
     }
 
     fn get_king_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
@@ -871,6 +870,7 @@ impl Board {
             })
     }
 
+    // TODO: iteratoooooor!
     fn square_attacked_by_pieces(&self, origin: Coord, by_player: Player) -> Vec<Piece> {
         let mut results: Vec<Piece> = vec![];
 
@@ -977,7 +977,7 @@ impl Board {
                 return false;
             }
         }
-        self.get_legal_moves(ply.origin).contains(ply)
+        self.get_legal_moves(ply.origin).any(|x| &x == ply)
     }
 
     pub fn verify_status(&self) -> Status {
@@ -987,7 +987,7 @@ impl Board {
             return Status::Draw;
         }
 
-        if !self.get_all_moves().is_empty() {
+        if self.get_all_moves().next().is_some() {
             return Status::Ongoing;
         }
 

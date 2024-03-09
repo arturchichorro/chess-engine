@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use coord::Coord;
 mod board;
 mod coord;
 mod engine;

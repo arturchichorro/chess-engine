@@ -1,17 +1,16 @@
-use crate::{board::Board, game::Game, ply::Ply};
+use crate::{board::Board, game::Game};
 use std::time::Instant;
 
 // Performance tests
 pub fn perft(board: &Board, depth: i32) -> u64 {
-    let move_vec: Vec<Ply> = board.get_all_moves();
     let mut nodes = 0;
 
     if depth == 0 {
         return 1;
     }
 
-    for i in 0..move_vec.len() {
-        let new_board_state = board.make_move(move_vec[i]);
+    for m in board.get_all_moves() {
+        let new_board_state = board.make_move(m);
         nodes += perft(&new_board_state, depth - 1);
     }
     nodes
@@ -25,9 +24,8 @@ pub fn perft_divider() {
     let mut result = 0;
 
     Board::check_everything(board);
-    let move_vec = board.get_all_moves();
-    move_vec.iter().for_each(|ply| {
-        let new_board_state = board.make_move(*ply);
+    board.get_all_moves().for_each(|ply| {
+        let new_board_state = board.make_move(ply);
 
         let accum = perft(&new_board_state, depth - 1);
 
