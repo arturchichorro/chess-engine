@@ -325,7 +325,8 @@ impl Board {
                 Player::White => self.white_king_loc,
             };
 
-            let checking_pieces = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
+            let iterator = self.square_attacked_by_pieces(king_loc, self.turn.opponent());
+            let checking_pieces: Vec<Piece> = iterator.collect();
 
             #[auto_enum(Iterator)]
             let result = if checking_pieces.len() == 1 {
@@ -867,62 +868,55 @@ impl Board {
             })
     }
 
-    // TODO: iteratoooooor!
-    fn square_attacked_by_pieces(&self, origin: Coord, by_player: Player) -> Vec<Piece> {
-        let mut results: Vec<Piece> = vec![];
-
-        Coord::LIST_CARDINAL
+    fn square_attacked_by_pieces<'a>(
+        &'a self,
+        origin: Coord,
+        by_player: Player,
+    ) -> impl Iterator<Item = Piece> + 'a {
+        let iter1 = Coord::LIST_CARDINAL
             .iter()
             .map(|c| (c, Kind::Rook))
             .chain(Coord::LIST_DIAGONAL.iter().map(|c| (c, Kind::Bishop)))
-            .for_each(|(&dir, piece)| {
+            .flat_map(move |(&dir, piece)| {
                 (1..)
                     .map(move |i| origin + dir * i)
                     .take_while(|&c| c.is_valid())
-                    .take_while(|&c| self.player_at_square(c) != Some(by_player.opponent()))
+                    .take_while(move |&c| self.player_at_square(c) != Some(by_player.opponent()))
                     .take_while(move |&c| self.player_at_square(c - dir) != Some(by_player))
-                    .filter(|&c| self.player_at_square(c) == Some(by_player))
-                    .for_each(|c| {
-                        if self.kind_at_square(c) == Some(piece)
+                    .filter(move |&c| self.player_at_square(c) == Some(by_player))
+                    .filter(move |&c| {
+                        self.kind_at_square(c) == Some(piece)
                             || self.kind_at_square(c) == Some(Kind::Queen)
-                        {
-                            results.push(self.get_piece_by_coord(c).unwrap());
-                        }
                     })
+                    .map(|c| self.get_piece_by_coord(c).unwrap())
             });
 
-        [Coord::L, Coord::R]
+        let iter2 = [Coord::L, Coord::R]
             .iter()
-            .map(|&c| origin + c - by_player.advancing_direction())
+            .map(move |&c| origin + c - by_player.advancing_direction())
             .filter(|&c| c.is_valid())
             .map(|c| self.get_piece_by_coord(c))
             .flatten()
-            .for_each(|p| {
-                if p.kind == Kind::Pawn && p.player == by_player {
-                    results.push(*p);
-                }
-            });
+            .filter(move |p| p.kind == Kind::Pawn && p.player == by_player)
+            .cloned();
 
-        [
-            (Coord::LIST_KNIGHT, Kind::Knight),
-            (Coord::LIST_CARDINAL_DIAGONAL, Kind::King),
+        let iter3 = [
+            (&Coord::LIST_KNIGHT, Kind::Knight),
+            (&Coord::LIST_CARDINAL_DIAGONAL, Kind::King),
         ]
         .into_iter()
-        .for_each(|(coords, piece)| {
+        .flat_map(move |(coords, piece)| {
             coords
                 .iter()
-                .map(|&c| origin + c)
+                .map(move |&c| origin + c)
                 .filter(|&c| c.is_valid())
                 .map(|c| self.get_piece_by_coord(c))
                 .flatten()
-                .for_each(|p| {
-                    if p.kind == piece && p.player == by_player {
-                        results.push(*p)
-                    }
-                })
+                .filter(move |p| p.kind == piece && p.player == by_player)
+                .cloned()
         });
 
-        results
+        iter1.chain(iter2).chain(iter3)
     }
 
     fn get_castling_moves<'a>(&'a self) -> impl Iterator<Item = Ply> + 'a {
