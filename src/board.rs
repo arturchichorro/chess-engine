@@ -303,17 +303,15 @@ impl Board {
                     .concat()
                     // TODO: returns iter
                 }
-                Kind::Knight => self
-                    .get_knight_moves_trial(coord, &Coord::LIST_KNIGHT)
-                    .collect(), // TODO: returns iter
+                Kind::Knight => self.get_knight_moves(coord).collect(), // TODO: returns iter
                 Kind::Bishop => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_DIAGONAL), // TODO: returns iter
                 Kind::Rook => self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL),
                 Kind::Queen => {
                     self.get_queen_rook_bishop_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL)
                 }
                 Kind::King => vec![
-                    self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL), // TODO: returns iter
-                    self.get_castling_moves(), // TODO: returns iter
+                    self.get_king_moves(coord).collect(), // TODO: returns iter
+                    self.get_castling_moves(),            // TODO: returns iter
                 ]
                 .concat(),
             }
@@ -333,7 +331,7 @@ impl Board {
 
             if checking_pieces.len() == 1 {
                 match piece_in_square.kind {
-                    Kind::King => self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                    Kind::King => self.get_king_moves(coord).collect(),
 
                     _ => {
                         if let Some(_) = self.is_piece_pinned(*piece_in_square) {
@@ -393,7 +391,7 @@ impl Board {
                 }
             } else if checking_pieces.len() == 2 {
                 match piece_in_square.kind {
-                    Kind::King => self.get_king_moves(coord, &Coord::LIST_CARDINAL_DIAGONAL),
+                    Kind::King => self.get_king_moves(coord).collect(),
                     _ => {
                         vec![]
                     }
@@ -578,51 +576,28 @@ impl Board {
         .collect()
     }
 
-    fn get_king_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+    fn get_king_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
 
-        directions
+        Coord::LIST_CARDINAL_DIAGONAL
             .iter()
-            .map(|&delta| origin + delta)
-            .filter(|&pos| {
+            .map(move |&delta| origin + delta)
+            .filter(move |&pos| {
                 pos.is_valid()
                     && self.player_at_square(pos) != Some(player)
                     && !self.is_square_attacked(pos, player.opponent())
             })
-            .map(|pos| Ply {
+            .map(move |pos| Ply {
                 origin,
                 destination: pos,
                 promotion: None,
             })
-            .collect()
     }
 
-    fn get_knight_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+    fn get_knight_moves<'a>(&'a self, origin: Coord) -> impl Iterator<Item = Ply> + 'a {
         let player = self.player_at_square(origin).unwrap();
 
-        directions
-            .iter()
-            .map(|&delta| origin + delta)
-            .filter(|&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
-            .map(|pos| Ply {
-                origin,
-                destination: pos,
-                promotion: None,
-            })
-            .collect()
-    }
-
-    fn get_knight_moves_trial<'a, 'b>(
-        &'a self,
-        origin: Coord,
-        directions: &'b [Coord],
-    ) -> impl Iterator<Item = Ply> + 'a
-    where
-        'b: 'a,
-    {
-        let player = self.player_at_square(origin).unwrap();
-
-        directions
+        Coord::LIST_KNIGHT
             .iter()
             .map(move |&delta| origin + delta)
             .filter(move |&pos| pos.is_valid() && self.player_at_square(pos) != Some(player))
@@ -634,6 +609,27 @@ impl Board {
     }
 
     fn get_queen_rook_bishop_moves(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
+        let player = self.player_at_square(origin).unwrap();
+
+        directions
+            .iter()
+            .map(|&dir| {
+                (1..)
+                    .map(move |i| origin + dir * i)
+                    .take_while(|&c| c.is_valid())
+                    .take_while(|&c| self.player_at_square(c) != Some(player))
+                    .take_while(move |&c| self.player_at_square(c - dir) != Some(player.opponent()))
+                    .map(|c| Ply {
+                        origin,
+                        destination: c,
+                        promotion: None,
+                    })
+            })
+            .flatten()
+            .collect()
+    }
+
+    fn get_queen_rook_bishop_moves_trial(&self, origin: Coord, directions: &[Coord]) -> Vec<Ply> {
         let player = self.player_at_square(origin).unwrap();
 
         directions
