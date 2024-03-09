@@ -3,17 +3,17 @@ use rayon::prelude::*;
 use std::time::Instant;
 
 // Performance tests
-pub fn perft(board: &Board, depth: i32, parallel: bool) -> u64 {
+pub fn perft(board: &Board, depth: i32, parallel: i32) -> u64 {
     if depth == 0 {
         return 1;
     }
 
-    if parallel {
+    if parallel > 0 {
         board
             .get_all_moves_par()
             .map(|m| {
                 let new_board_state = board.make_move(m);
-                perft(&new_board_state, depth - 1, false)
+                perft(&new_board_state, depth - 1, parallel - 1)
             })
             .sum()
     } else {
@@ -21,7 +21,7 @@ pub fn perft(board: &Board, depth: i32, parallel: bool) -> u64 {
             .get_all_moves()
             .map(|m| {
                 let new_board_state = board.make_move(m);
-                perft(&new_board_state, depth - 1, false)
+                perft(&new_board_state, depth - 1, parallel - 1)
             })
             .sum()
     }
@@ -38,7 +38,7 @@ pub fn perft_divider() {
     board.get_all_moves().for_each(|ply| {
         let new_board_state = board.make_move(ply);
 
-        let accum = perft(&new_board_state, depth - 1, true);
+        let accum = perft(&new_board_state, depth - 1, 1);
 
         result += accum;
         println!(
@@ -61,7 +61,7 @@ pub fn perft_one_pos() -> () {
 
     let game = Game::new_from_fen(fen);
     for (depth, value) in checks {
-        let result = perft(game.states.last().unwrap(), depth, true);
+        let result = perft(game.states.last().unwrap(), depth, 1);
         println!("Position {fen}, depth {depth}, result {result}, expected {value}");
         // assert_eq!(result, value);
     }
@@ -100,7 +100,7 @@ pub fn perft_suite() -> () {
         let game = Game::new_from_fen(fen);
         for (depth, value) in checks {
             let start = Instant::now();
-            let result = perft(game.states.last().unwrap(), depth, true);
+            let result = perft(game.states.last().unwrap(), depth, 2);
             let duration = Instant::now().duration_since(start);
             println!("Position {fen}, depth {depth}, result {result}, expected {value}, took {duration:?}, speed {:.2}", result as f64 / duration.as_secs_f64());
             // assert_eq!(result, value);
