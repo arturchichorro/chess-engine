@@ -448,8 +448,6 @@ impl Board {
         }
     }
 
-    fn x() {}
-
     pub fn is_piece_pinned(&self, p: Piece) -> Option<Coord> {
         if p.kind == Kind::King {
             return None;
