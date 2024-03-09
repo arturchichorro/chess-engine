@@ -1,5 +1,3 @@
-use std::path::MAIN_SEPARATOR;
-
 use crate::{
     coord::Coord,
     piece::{Kind, Piece},
@@ -319,6 +317,7 @@ impl Board {
         }
     }
 
+    #[auto_enum(Iterator)]
     pub fn get_legal_moves<'a>(&'a self, coord: Coord) -> impl Iterator<Item = Ply> + 'a {
         if let Some(piece_in_square) = self.get_piece_by_coord(coord) {
             let king_loc = match self.turn {
@@ -336,7 +335,7 @@ impl Board {
 
                     _ => {
                         if let Some(_) = self.is_piece_pinned(*piece_in_square) {
-                            return Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>;
+                            return std::iter::empty();
                         }
 
                         match checking_pieces[0].kind {
@@ -347,13 +346,12 @@ impl Board {
                                             + checking_pieces[0].player.advancing_direction()
                                         && piece_in_square.kind == Kind::Pawn
                                     {
-                                        return Box::new(self.get_pseudo_legal_moves(coord).filter(
+                                        return self.get_pseudo_legal_moves(coord).filter(
                                             move |ply| {
                                                 ply.destination == checking_pieces[0].coord
                                                     || ply.destination == en_passant_square
                                             },
-                                        ))
-                                            as Box<dyn Iterator<Item = Ply>>;
+                                        );
                                     }
                                 }
 
@@ -441,17 +439,16 @@ impl Board {
                     if piece_in_square.kind == Kind::Pawn
                         && self.is_pawn_enpassant_pinned(*piece_in_square)
                     {
-                        return Box::new(
-                            self.get_pawn_moves(coord)
-                                .chain(self.get_pawn_captures(coord)),
-                        ) as Box<dyn Iterator<Item = Ply>>;
+                        return self
+                            .get_pawn_moves(coord)
+                            .chain(self.get_pawn_captures(coord));
                     }
 
                     Box::new(self.get_pseudo_legal_moves(coord)) as Box<dyn Iterator<Item = Ply>>
                 }
             }
         } else {
-            Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Ply>>
+            std::iter::empty()
         }
     }
 
